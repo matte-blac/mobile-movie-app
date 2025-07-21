@@ -75,3 +75,25 @@ interface Movie {
     movie: TrendingMovie;
     index: number;
   }
+
+  
+  interface SavedMovie {
+  $id: string;
+  $collectionId: string;
+  $databaseId: string;
+  $createdAt: string;
+  $updatedAt: string;
+  $permissions: string[];
+  movie_id: number;
+  title: string;
+  poster_path: string;
+  vote_average: number;
+  release_date: string;
+  saved_at: string;
+}
+
+  interface UserPreferences {
+  notifications_enabled: boolean;
+  dark_mode_enabled: boolean;
+  language: string;
+}
