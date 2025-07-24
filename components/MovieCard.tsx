@@ -1,7 +1,8 @@
 import { icons } from "@/constants/icons";
-import { isMovieSaved, removeSavedMovie, saveMovie } from '@/services/appwrite';
+import { useSavedMovies } from "@/context/SavedMoviesContext";
+import { removeSavedMovie, saveMovie } from '@/services/appwrite';
 import { Link } from "expo-router";
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert, Image, Text, TouchableOpacity, View } from 'react-native';
 
 interface MovieCardProps extends Movie {
@@ -18,23 +19,25 @@ const MovieCard = ({
     ...movieData
 }: Movie) => {
 
-    const [isSaved, setIsSaved] = useState(false);
+    const {isMovieSaved, addSavedMovie, removeSavedMovie: removeFromGlobalState} = useSavedMovies();
     const [isLoading, setIsLoading] = useState(false);
 
-    useEffect(() => {
-        const checkSavedStatus = async () => {
-            try {
-                const saved = await isMovieSaved(id);
-                setIsSaved(saved);
-            } catch (error) {
-                console.error('Error checking saved status:', error);
-            }
-        };
+    const isSaved = isMovieSaved(id)
 
-        if (showSaveButton) {
-            checkSavedStatus();
-        }
-    }, [id, showSaveButton]);
+    // useEffect(() => {
+    //     const checkSavedStatus = async () => {
+    //         try {
+    //             const saved = await isMovieSaved(id);
+    //             setIsSaved(saved);
+    //         } catch (error) {
+    //             console.error('Error checking saved status:', error);
+    //         }
+    //     };
+
+    //     if (showSaveButton) {
+    //         checkSavedStatus();
+    //     }
+    // }, [id, showSaveButton]);
 
     const handleSaveToggle = async (e: any) => {
         e.preventDefault();
@@ -53,10 +56,10 @@ const MovieCard = ({
 
             if (isSaved) {
                 await removeSavedMovie(id);
-                setIsSaved(false);
+                removeFromGlobalState(id);
             } else {
                 await saveMovie(movieToSave);
-                setIsSaved(true);
+                addSavedMovie(id);
             }
         } catch (error) {
             console.error('Error saving movie:', error);
@@ -75,7 +78,7 @@ const MovieCard = ({
     };
 
     return (
-        <View className="w-[30%] relative">
+        <View className="relative">
             <Link href={`/movies/${id}`} asChild>
                 <TouchableOpacity>
                     <Image

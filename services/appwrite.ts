@@ -1,14 +1,24 @@
-import { Client, Databases, ID, Query } from "react-native-appwrite";
+import { Account, Client, Databases, ID, Query } from "react-native-appwrite";
 
 const DATABASE_ID = process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!;
 const COLLECTION_ID = process.env.EXPO_PUBLIC_APPWRITE_COLLECTION_ID!;
 const SAVED_MOVIES_COLLECTION_ID = process.env.EXPO_PUBLIC_APPWRITE_SAVED_MOVIES_COLLECTION_ID!;
 
-const client = new Client()
+export const client = new Client()
     .setEndpoint(process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!)
     .setProject(process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!);
 
 const database = new Databases(client);
+const account = new Account(client)
+
+const getCurrentUserId = async (): Promise<string> => {
+    try {
+        const user = await account.get()
+        return user.$id
+    } catch (error) {
+        throw new Error('User not authenticated')
+    }
+}
 
 export const updateSearchCount = async (query: string, movie: Movie) => {
     try {
@@ -57,8 +67,15 @@ export const getTrendingMovies = async (): Promise<TrendingMovie[] | undefined> 
 
 export const saveMovie = async (movie: Movie) => {
     try {
+        // const existingMovie = await database.listDocuments(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, [
+        //     Query.equal('movie_id', movie.id)
+        // ])
+        
+        const userId = await getCurrentUserId()
+
         const existingMovie = await database.listDocuments(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, [
-            Query.equal('movie_id', movie.id)
+            Query.equal('movie_id', movie.id),
+            Query.equal('user_id', userId)
         ])
 
         if (existingMovie.documents.length > 0) {
@@ -66,6 +83,7 @@ export const saveMovie = async (movie: Movie) => {
         }
 
         await database.createDocument(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, ID.unique(), {
+            user_id: userId,
             movie_id: movie.id,
             title: movie.title,
             poster_path: `https://api.themoviedb.org/t/p/w500${movie.poster_path}`,
@@ -83,8 +101,12 @@ export const saveMovie = async (movie: Movie) => {
 
 export const removeSavedMovie = async (movieId: number) => {
     try {
+
+        const userId = await getCurrentUserId()
+        
         const result = await database.listDocuments(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, [
-            Query.equal('movie_id', movieId)
+            Query.equal('movie_id', movieId),
+            Query.equal('user_id', userId)
         ]);
 
         if (result.documents.length > 0) {
@@ -99,7 +121,11 @@ export const removeSavedMovie = async (movieId: number) => {
 
 export const getSavedMovies = async () => {
     try {
+
+        const userId = await getCurrentUserId()
+
         const result = await database.listDocuments(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, [
+            Query.equal('user_id', userId),
             Query.orderDesc('saved_at'),
             Query.limit(100)
         ])
@@ -113,8 +139,12 @@ export const getSavedMovies = async () => {
 
 export const isMovieSaved = async (movieId: number): Promise<boolean> => {
     try {
+
+        const userId = await getCurrentUserId()
+
         const result = await database.listDocuments(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, [
-            Query.equal('movie_id', movieId)
+            Query.equal('movie_id', movieId),
+            Query.equal('user_id', userId)
         ]);
 
         return result.documents.length > 0;
@@ -126,7 +156,12 @@ export const isMovieSaved = async (movieId: number): Promise<boolean> => {
 
 export const clearAllSavedMovies = async () => {
     try {
-        const result = await database.listDocuments(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID)
+
+        const userId = await getCurrentUserId()
+
+        const result = await database.listDocuments(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, [
+            Query.equal('user_id', userId)
+        ])
 
         const deletePromises = result.documents.map(doc => 
             database.deleteDocument(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, doc.$id)

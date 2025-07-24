@@ -28,7 +28,7 @@ export default function Index() {
 
     return (
         <View className="flex-1 bg-primary">
-            <Image source={images.bg} className="absolute w-full z-0" />
+            <Image source={images.bg} className="absolute w-full w-full z-0" />
 
             <ScrollView className="flex-1 px-5"
                 showsVerticalScrollIndicator={false} contentContainerStyle={{
@@ -70,12 +70,13 @@ export default function Index() {
                             </View>
                         )}
                         <>
-                            <Text className="text-lg text-white font-bold mt-5 mb-3"> Latest Movies</Text>
+                            <Text className="text-lg text-white font-bold mt-5 mb-3">Latest Movies</Text>
                             <FlatList
                                 data={movies}
                                 renderItem={({ item }) => {
                                     return (
-                                        <MovieCard
+                                        <View style={{width: '30%'}}>
+                                            <MovieCard
                                             id={item.id}
                                             poster_path={item.poster_path}
                                             title={item.title}
@@ -83,6 +84,8 @@ export default function Index() {
                                             release_date={item.release_date} adult={false} backdrop_path={""} genre_ids={[]}
                                             original_language={""} original_title={""} overview={""} popularity={0}
                                             video={false} vote_count={0} />
+                                        </View>
+                                        
                                     );
                                 }}
                                 keyExtractor={(item) => item.id.toString()}

@@ -1,5 +1,6 @@
 import { icons } from "@/constants/icons";
 import { images } from "@/constants/images";
+import { useAuth } from "@/context/AuthContext";
 import { clearAllSavedMovies } from "@/services/appwrite";
 import React, { useState } from 'react';
 import { Alert, Image, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
@@ -26,17 +27,18 @@ interface ProfileItemProps {
     showArrow?: boolean;
     rightComponent?: React.ReactNode;
     isLast?: boolean;
+    isDangerous?: boolean;
 }
 
-const ProfileItem = ({ icon, title, subtitle, onPress, showArrow = true, rightComponent, isLast = false }: ProfileItemProps) => (
+const ProfileItem = ({ icon, title, subtitle, onPress, showArrow = true, rightComponent, isLast = false, isDangerous = false }: ProfileItemProps) => (
     <TouchableOpacity 
         onPress={onPress}
         className={`flex-row items-center px-4 py-4 ${!isLast ? 'border-b border-dark-100' : ''}`}
         disabled={!onPress}
     >
-        <Image source={icon} className='size-6 mr-4' tintColor='#ab8bff'/>
+        <Image source={icon} className='size-6 mr-4' tintColor={isDangerous ? '#ef4444' : '#ab8bff'}/>
         <View className='flex-1'>
-            <Text className='text-white text-base font-medium'>{title}</Text>
+            <Text className={`text-base font-medium ${isDangerous ? 'text-red-400' : 'text-white'}`}>{title}</Text>
             {subtitle && (
                 <Text className='text-gray-400 text-sm mt-1'>{subtitle}</Text>
             )}
@@ -48,8 +50,30 @@ const ProfileItem = ({ icon, title, subtitle, onPress, showArrow = true, rightCo
 );
 
 const Profile = () => {
+    const { user, logout } = useAuth();
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [darkModeEnabled, setDarkModeEnabled] = useState(true);
+
+    const handleLogout = () => {
+        Alert.alert(
+            "Sign Out",
+            "Are you sure you want to sign out?",
+            [
+                { text: "Cancel", style: "cancel" },
+                { 
+                    text: "Sign Out", 
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await logout();
+                        } catch (error: any) {
+                            Alert.alert("Error", "Failed to sign out. Please try again.");
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     const handleClearSavedMovies = () => {
         Alert.alert(
@@ -116,8 +140,12 @@ const Profile = () => {
                     <View className='bg-accent/20 border-2 border-accent rounded-full p-6 mb-4'>
                         <Image source={icons.person} className='size-12' tintColor='#ab8bff'/>
                     </View>
-                    <Text className='text-white text-xl font-bold'>Movie Explorer</Text>
-                    <Text className='text-gray-400 text-sm mt-1'>Discover Amazing Movies</Text>
+                    <Text className='text-white text-xl font-bold'>
+                        {user?.name || 'Movie Explorer'}
+                    </Text>
+                    <Text className='text-gray-400 text-sm mt-1'>
+                        {user?.email || 'Discover Amazing Movies'}
+                    </Text>
                 </View>
 
                 {/* Preferences Section */}
@@ -161,6 +189,18 @@ const Profile = () => {
                         title="Clear Saved Movies"
                         subtitle="Remove all movies from your saved list"
                         onPress={handleClearSavedMovies}
+                        isDangerous
+                    />
+                </ProfileSection>
+
+                {/* Account Section */}
+                <ProfileSection title="Account">
+                    <ProfileItem 
+                        icon={icons.arrow}
+                        title="Sign Out"
+                        subtitle="Sign out of your account"
+                        onPress={handleLogout}
+                        isDangerous
                         isLast
                     />
                 </ProfileSection>

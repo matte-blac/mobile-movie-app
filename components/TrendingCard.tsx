@@ -1,8 +1,8 @@
-import {View, Text, TouchableOpacity, Image} from 'react-native'
-import React from 'react'
-import {Link} from "expo-router";
+import { images } from "@/constants/images";
 import MaskedView from "@react-native-masked-view/masked-view";
-import {images} from "@/constants/images";
+import { Link } from "expo-router";
+import React from 'react';
+import { Image, Text, TouchableOpacity, View } from 'react-native';
 
 const TrendingCard = ({ movie: {movie_id, title, poster_url}, index}: TrendingCardProps) => {
     const imageUrl = poster_url?.replace('https://api.themoviedb.org/t/p/w500/', 'https://image.tmdb.org/t/p/w500/');
@@ -15,7 +15,7 @@ const TrendingCard = ({ movie: {movie_id, title, poster_url}, index}: TrendingCa
                     className='w-32 h-48 rounded-lg'
                     resizeMode='cover'
                     onError={(error) => console.log('Image load error:',error)}
-                    onLoad={() => console.log('Image loaded successfully')}
+                    // onLoad={() => console.log('Image loaded successfully')}
                 />
                 <View className='absolute bottom-5 -left-0.5 px-2 py-1 rounded-full'>
                     <MaskedView maskElement={

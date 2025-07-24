@@ -1,9 +1,10 @@
-import {View, Text, Image, ImageBackground} from 'react-native'
-import React from 'react'
-import {Tabs} from "expo-router";
+import { Redirect, Tabs } from "expo-router";
+import React from 'react';
+import { ActivityIndicator, Image, ImageBackground, Text, View } from 'react-native';
 // import {ImageBackground} from "expo-image";
-import {images} from "@/constants/images";
-import {icons} from "@/constants/icons";
+import { icons } from "@/constants/icons";
+import { images } from "@/constants/images";
+import { useAuth } from '@/context/AuthContext';
 
 const TabIcon = ({focused, icon, title}: any) => {
     if(focused) {
@@ -25,6 +26,21 @@ const TabIcon = ({focused, icon, title}: any) => {
 }
 
 const _Layout = () => {
+    const {isAuthenticated, loading} =useAuth()
+
+    if (loading) {
+        return (
+            <View className='flex-1 bg-priary justify-center items-center'>
+                <ActivityIndicator size='large' color='accent'/>
+                <Text className='text-white mt-4'>Loading...</Text>
+            </View>
+        )
+    }
+
+    if (!isAuthenticated) {
+        return  <Redirect href='/login'/>
+    }
+
     return (
         <Tabs
         screenOptions={{

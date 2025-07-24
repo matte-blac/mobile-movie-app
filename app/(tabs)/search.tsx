@@ -1,12 +1,12 @@
-import {View, Text, Image, FlatList, ActivityIndicator} from 'react-native'
-import React, {useEffect, useState} from 'react'
 import MovieCard from "@/components/MovieCard";
-import useFetch from "@/services/useFetch";
-import {fetchMovies} from "@/services/api";
-import {images} from "@/constants/images";
-import {icons} from "@/constants/icons";
 import SearchBar from "@/components/SearchBar";
-import {updateSearchCount} from "@/services/appwrite";
+import { icons } from "@/constants/icons";
+import { images } from "@/constants/images";
+import { fetchMovies } from "@/services/api";
+import { updateSearchCount } from "@/services/appwrite";
+import useFetch from "@/services/useFetch";
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Image, Text, View } from 'react-native';
 
 const Search = () => {
     const [searchQuery, setSearchQuery] = useState("");
@@ -45,7 +45,11 @@ const Search = () => {
             <Image source={images.bg} className="flex-1 absolute w-full z-0" resizeMode="cover" />
             <FlatList
                 data={movies}
-                renderItem={({ item }) => <MovieCard {...item} />}
+                renderItem={({ item }) => 
+                <View style={{width: '30%'}}>
+                    <MovieCard {...item} />
+                </View>
+                }
                 keyExtractor={(item) => item.id.toString()}
                 className="px-5"
                 numColumns={3}
