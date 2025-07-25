@@ -1,6 +1,7 @@
 import { icons } from "@/constants/icons";
 import { images } from "@/constants/images";
 import { useAuth } from "@/context/AuthContext";
+import { useSavedMovies } from "@/context/SavedMoviesContext";
 import { clearAllSavedMovies } from "@/services/appwrite";
 import React, { useState } from 'react';
 import { Alert, Image, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
@@ -51,6 +52,7 @@ const ProfileItem = ({ icon, title, subtitle, onPress, showArrow = true, rightCo
 
 const Profile = () => {
     const { user, logout } = useAuth();
+    const { refreshSavedMovies } = useSavedMovies()
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [darkModeEnabled, setDarkModeEnabled] = useState(true);
 
@@ -86,7 +88,8 @@ const Profile = () => {
                     style: "destructive",
                     onPress: async () => {
                         try {
-                            await clearAllSavedMovies();
+                            await clearAllSavedMovies()
+                            await refreshSavedMovies()
                             Alert.alert("Success", "All saved movies have been cleared.");
                         } catch (error) {
                             Alert.alert("Error", "Failed to clear saved movies. Please try again.");
