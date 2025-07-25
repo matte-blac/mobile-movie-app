@@ -17,7 +17,7 @@ const TrendingCard = ({ movie: {movie_id, title, poster_url}, index}: TrendingCa
                     onError={(error) => console.log('Image load error:',error)}
                     // onLoad={() => console.log('Image loaded successfully')}
                 />
-                <View className='absolute bottom-5 -left-0.5 px-2 py-1 rounded-full'>
+                <View className='absolute -left-0.5 px-2 py-1 rounded-full'>
                     <MaskedView maskElement={
                         <Text className='font-bold text-white text-6xl'>
                             {index + 1}
