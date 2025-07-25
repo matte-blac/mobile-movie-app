@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useSavedMovies } from "@/context/SavedMoviesContext";
 import { clearAllSavedMovies } from "@/services/appwrite";
 import React, { useState } from 'react';
-import { Alert, Image, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 interface ProfileSectionProps {
     title: string;
@@ -152,7 +152,7 @@ const Profile = () => {
                 </View>
 
                 {/* Preferences Section */}
-                <ProfileSection title="Preferences">
+                {/* <ProfileSection title="Preferences">
                     <ProfileItem 
                         icon={icons.save}
                         title="Notifications"
@@ -167,23 +167,7 @@ const Profile = () => {
                             />
                         }
                     />
-                    <ProfileItem 
-                        icon={icons.person}
-                        title="Dark Mode"
-                        subtitle="Always enabled for better movie viewing"
-                        showArrow={false}
-                        rightComponent={
-                            <Switch
-                                value={darkModeEnabled}
-                                onValueChange={setDarkModeEnabled}
-                                trackColor={{ false: '#374151', true: '#ab8bff' }}
-                                thumbColor={darkModeEnabled ? '#ffffff' : '#9ca3af'}
-                                disabled={true}
-                            />
-                        }
-                        isLast
-                    />
-                </ProfileSection>
+                </ProfileSection> */}
 
                 {/* Data Section */}
                 <ProfileSection title="Data">

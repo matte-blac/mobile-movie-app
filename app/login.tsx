@@ -2,15 +2,18 @@ import { icons } from '@/constants/icons';
 import { images } from '@/constants/images';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 
@@ -64,96 +67,111 @@ const Login = () => {
   return (
     <KeyboardAvoidingView 
       className="flex-1 bg-primary"
+      behavior={Platform.OS === 'android' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'android' ? 0 : 20}
     >
-      <Image source={images.bg} className="absolute w-full h-full z-0" />
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View className='flex-1'>
+          <Image source={images.bg} className="absolute w-full h-full z-0" />
       
-      <ScrollView 
-        contentContainerStyle={{ flexGrow: 1 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View className="flex-1 justify-center px-6 py-12">
-          {/* Logo */}
-          <View className="items-center mb-12">
-            <Image source={icons.logo} className="w-20 h-16 mb-4" />
-            <Text className="text-white text-3xl font-bold text-center">
-              Movie Explorer
-            </Text>
-            <Text className="text-gray-400 text-base text-center mt-2">
-              {isLogin ? 'Welcome back!' : 'Create your account'}
-            </Text>
-          </View>
-
-          {/* Form */}
-          <View className="space-y-4">
-            {!isLogin && (
-              <View className="mb-4">
-                <Text className="text-white text-sm font-medium mb-2">Name</Text>
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Enter your name"
-                  placeholderTextColor="#a8b5db"
-                  className="bg-dark-200 text-white px-4 py-4 rounded-lg text-base"
-                  autoCapitalize="words"
-                />
+          <ScrollView 
+            contentContainerStyle={{ flexGrow: 1 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            <View className="flex-1 justify-center px-6 py-12">
+              {/* Logo */}
+              <View className="items-center mb-12">
+                <Image source={icons.logo} className="w-20 h-16 mb-4" />
+                <Text className="text-white text-3xl font-bold text-center">
+                  Movie Explorer
+                </Text>
+                <Text className="text-gray-400 text-base text-center mt-2">
+                  {isLogin ? 'Welcome back!' : 'Create your account'}
+                </Text>
               </View>
-            )}
 
-            <View className="mb-4">
-              <Text className="text-white text-sm font-medium mb-2">Email</Text>
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                placeholder="Enter your email"
-                placeholderTextColor="#a8b5db"
-                className="bg-dark-200 text-white px-4 py-4 rounded-lg text-base"
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
+              {/* Form */}
+              <View className="space-y-4">
+                {!isLogin && (
+                  <View className="mb-4">
+                    <Text className="text-white text-sm font-medium mb-2">Name</Text>
+                    <TextInput
+                      value={name}
+                      onChangeText={setName}
+                      placeholder="Enter your name"
+                      placeholderTextColor="#a8b5db"
+                      className="bg-dark-200 text-white px-4 py-4 rounded-lg text-base"
+                      autoCapitalize="words"
+                      returnKeyType='next'
+                      blurOnSubmit={false}
+                    />
+                  </View>
+                )}
+
+                <View className="mb-4">
+                  <Text className="text-white text-sm font-medium mb-2">Email</Text>
+                  <TextInput
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="Enter your email"
+                    placeholderTextColor="#a8b5db"
+                    className="bg-dark-200 text-white px-4 py-4 rounded-lg text-base"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    returnKeyType='next'
+                    blurOnSubmit={false}
+                  />
+                </View>
+
+                <View className="mb-6">
+                  <Text className="text-white text-sm font-medium mb-2">Password</Text>
+                  <TextInput
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Enter your password"
+                    placeholderTextColor="#a8b5db"
+                    className="bg-dark-200 text-white px-4 py-4 rounded-lg text-base"
+                    secureTextEntry
+                    autoCapitalize="none"
+                    returnKeyType='done'
+                    onSubmitEditing={handleSubmit}
+                  />
+                </View>
+
+                {/* Submit Button */}
+                <TouchableOpacity
+                  onPress={handleSubmit}
+                  disabled={loading}
+                  className={`py-4 rounded-lg ${loading ? 'bg-gray-600' : 'bg-accent'}`}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text className="text-white text-center text-base font-semibold">
+                      {isLogin ? 'Sign In' : 'Create Account'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                {/* Toggle Mode */}
+                <View className="flex-row justify-center mt-6">
+                  <Text className="text-gray-400 text-sm">
+                    {isLogin ? "Don't have an account? " : 'Already have an account? '}
+                  </Text>
+                  <TouchableOpacity onPress={toggleMode}>
+                    <Text className="text-accent text-sm font-medium">
+                      {isLogin ? 'Sign Up' : 'Sign In'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-
-            <View className="mb-6">
-              <Text className="text-white text-sm font-medium mb-2">Password</Text>
-              <TextInput
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Enter your password"
-                placeholderTextColor="#a8b5db"
-                className="bg-dark-200 text-white px-4 py-4 rounded-lg text-base"
-                secureTextEntry
-                autoCapitalize="none"
-              />
-            </View>
-
-            {/* Submit Button */}
-            <TouchableOpacity
-              onPress={handleSubmit}
-              disabled={loading}
-              className={`py-4 rounded-lg ${loading ? 'bg-gray-600' : 'bg-accent'}`}
-            >
-              {loading ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text className="text-white text-center text-base font-semibold">
-                  {isLogin ? 'Sign In' : 'Create Account'}
-                </Text>
-              )}
-            </TouchableOpacity>
-
-            {/* Toggle Mode */}
-            <View className="flex-row justify-center mt-6">
-              <Text className="text-gray-400 text-sm">
-                {isLogin ? "Don't have an account? " : 'Already have an account? '}
-              </Text>
-              <TouchableOpacity onPress={toggleMode}>
-                <Text className="text-accent text-sm font-medium">
-                  {isLogin ? 'Sign Up' : 'Sign In'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          </ScrollView>
         </View>
-      </ScrollView>
+      </TouchableWithoutFeedback>
+      
     </KeyboardAvoidingView>
   );
 };

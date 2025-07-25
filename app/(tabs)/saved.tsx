@@ -79,7 +79,7 @@ const Saved = () => {
                         No Saved Movies Yet
                     </Text>
                     <Text className="text-gray-400 text-center text-base leading-6">
-                        Save your favorites to them here
+                        Save your favorites to see them here
                     </Text>
                 </View>
             ): (
@@ -124,8 +124,11 @@ const Saved = () => {
                         paddingRight: 5,
                         marginBottom: 10
                     }}
-                    className="mt-2 pb-32"
-                    scrollEnabled={false}
+                    contentContainerStyle={{
+                        paddingBottom: 120,
+                        flexGrow: 1
+                    }}
+                    showsVerticalScrollIndicator={false}
                     />
                 </View>
             )}
