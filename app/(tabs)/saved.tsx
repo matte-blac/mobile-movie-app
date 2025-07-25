@@ -97,7 +97,11 @@ const Saved = () => {
                     <FlatList 
                     data={savedMovies}
                     renderItem={({item }) => (
-                        <View style={{width: '30%'}}>
+                        <View style={{
+                            width: '30%',
+                            maxWidth: 120,
+                            minWidth: 80
+                            }}>
                                 <MovieCard
                                 id={item.movie_id}
                                 poster_path={item.poster_path}
@@ -109,9 +113,9 @@ const Saved = () => {
                         />  
                             <TouchableOpacity
                                 onPress={() => handleRemoveMovie(item.movie_id)}
-                                className="w-full mt-2 bg-red-500/20 border border-red-500 rounded-lg py-2 px-3 flex-row items-center justify-center"
+                                className="w-full mt-2 bg-red-500/20 border border-red-500 rounded-lg py-1 px-2 flex-row items-center justify-center"
                             >
-                                <Image source={icons.save} className="size-4 mr-2" tintColor='#ef4444'/>
+                                <Image source={icons.save} className="size-3 mr-1" tintColor='#ef4444'/>
                                 <Text className="text-red-500 text-xs font-medium">Remove</Text>
                             </TouchableOpacity>
                         </View>
@@ -119,9 +123,9 @@ const Saved = () => {
                     keyExtractor={(item) => item.$id}
                     numColumns={3}
                     columnWrapperStyle={{
-                        justifyContent: 'flex-start',
-                        gap: 20,
-                        paddingRight: 5,
+                        justifyContent: 'flext-start',
+                        gap: 15,
+                        paddingHorizontal: 2,
                         marginBottom: 10
                     }}
                     contentContainerStyle={{
