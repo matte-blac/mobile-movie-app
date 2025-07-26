@@ -2,14 +2,14 @@ import { icons } from "@/constants/icons";
 import { useSavedMovies } from "@/context/SavedMoviesContext";
 import { removeSavedMovie, saveMovie } from '@/services/appwrite';
 import { Link } from "expo-router";
-import React, { useState } from 'react';
-import { Alert, Image, Text, TouchableOpacity, View } from 'react-native';
+import React, { memo, useCallback, useState, useMemo } from 'react';
+import { ActivityIndicator, Alert, Image, Text, TouchableOpacity, View } from 'react-native';
 
 interface MovieCardProps extends Movie {
     showSaveButton?: boolean;
 }
 
-const MovieCard = ({ 
+const MovieCard = memo(({ 
     id, 
     poster_path, 
     title, 
@@ -17,43 +17,31 @@ const MovieCard = ({
     release_date, 
     showSaveButton = true, 
     ...movieData
-}: Movie) => {
+}: MovieCardProps) => {
 
     const {isMovieSaved, addSavedMovie, removeSavedMovie: removeFromGlobalState} = useSavedMovies();
     const [isLoading, setIsLoading] = useState(false);
+    const [imageLoading, setImageLoading] = useState(true);
+    const [imageError, setImageError] = useState(false);
 
-    const isSaved = isMovieSaved(id)
+    const isSaved = isMovieSaved(id);
 
-    // useEffect(() => {
-    //     const checkSavedStatus = async () => {
-    //         try {
-    //             const saved = await isMovieSaved(id);
-    //             setIsSaved(saved);
-    //         } catch (error) {
-    //             console.error('Error checking saved status:', error);
-    //         }
-    //     };
+    // Memoize the movie object to prevent infinite re-renders
+    const movieToSave = useMemo((): Movie => ({
+        id,
+        title,
+        poster_path,
+        vote_average,
+        release_date,
+        ...movieData
+    }), [id, title, poster_path, vote_average, release_date, JSON.stringify(movieData)]);
 
-    //     if (showSaveButton) {
-    //         checkSavedStatus();
-    //     }
-    // }, [id, showSaveButton]);
-
-    const handleSaveToggle = async (e: any) => {
+    const handleSaveToggle = useCallback(async (e: any) => {
         e.preventDefault();
         e.stopPropagation();
         
         setIsLoading(true);
         try {
-            const movieToSave: Movie = {
-                id,
-                title,
-                poster_path,
-                vote_average,
-                release_date,
-                ...movieData
-            };
-
             if (isSaved) {
                 await removeSavedMovie(id);
                 removeFromGlobalState(id);
@@ -75,21 +63,67 @@ const MovieCard = ({
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [id, isSaved, movieToSave, addSavedMovie, removeFromGlobalState]);
+
+    const handleImageLoad = useCallback(() => {
+        setImageLoading(false);
+        setImageError(false);
+    }, []);
+
+    const handleImageError = useCallback(() => {
+        setImageLoading(false);
+        setImageError(true);
+    }, []);
+
+    const imageSource = useMemo(() => {
+        return poster_path && !imageError
+            ? { uri: `https://image.tmdb.org/t/p/w342/${poster_path}` }
+            : { uri: `https://placehold.co/342x513/1a1a1a/ffffff.png?text=${encodeURIComponent(title)}` };
+    }, [poster_path, imageError, title]);
+
+    const yearFromDate = useMemo(() => {
+        return release_date?.split('-')[0] || '';
+    }, [release_date]);
+
+    const roundedRating = useMemo(() => {
+        return Math.round(vote_average / 2);
+    }, [vote_average]);
 
     return (
         <View className="relative">
             <Link href={`/movies/${id}`} asChild>
                 <TouchableOpacity>
-                    <Image
-                        source={{
-                            uri: poster_path
-                                ? `https://image.tmdb.org/t/p/w500/${poster_path}`
-                                : `https://placehold.co/404/1a1a1a/ffffff.png`
-                        }}
-                        className="w-full h-52 rounded-lg"
-                        resizeMode="cover"
-                    />
+                    <View className="relative">
+                        <Image
+                            source={imageSource}
+                            style={{
+                                width: '100%',
+                                height: 208,
+                                borderRadius: 8,
+                            }}
+                            resizeMode="cover"
+                            onLoad={handleImageLoad}
+                            onError={handleImageError}
+                        />  
+
+                        {/* loading placeholder */}
+                        {imageLoading && (
+                            <View className="absolute inset-0 bg-dark-200 rounded-lg items-center justify-center">
+                                <ActivityIndicator color='accent' size='small' />
+                                <Text className="text-gray-400 text-xs mt-2">Loading...</Text>
+                            </View>
+                        )}
+
+                        {/* Error placeholder */}
+                        {imageError && !imageLoading && (
+                            <View className="absolute inset-0 bg-dark-200 rounded-lg items-center justify-center">
+                                <Image source={icons.logo} className="w-8 h-6 opacity-50"/>
+                                <Text className="text-gray-400 text-xs mt-2 text-center px-2" numberOfLines={2}>
+                                    {title}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
                     
                     {showSaveButton && (
                         <TouchableOpacity
@@ -113,18 +147,20 @@ const MovieCard = ({
                     <View className="flex-row items-center justify-start gap-x-1">
                         <Image source={icons.star} className="size-4"/>
                         <Text className="text-xs text-white font-bold uppercase">
-                            {Math.round(vote_average / 2)}
+                            {roundedRating}
                         </Text>
                     </View>
                     <View className="flex-row items-center justify-between">
                         <Text className="text-xs text-light-300 font-medium mt-1">
-                            {release_date?.split('-')[0]}
+                            {yearFromDate}
                         </Text>
                     </View>
                 </TouchableOpacity>
             </Link>
         </View>
     );
-};
+});
+
+MovieCard.displayName = 'MovieCard';
 
 export default MovieCard;

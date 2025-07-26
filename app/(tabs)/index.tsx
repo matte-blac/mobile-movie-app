@@ -3,11 +3,16 @@ import SearchBar from "@/components/SearchBar";
 import TrendingCard from "@/components/TrendingCard";
 import { icons } from "@/constants/icons";
 import { images } from "@/constants/images";
+import useFetch from "@/hooks/useFetch";
 import { fetchMovies } from "@/services/api";
 import { getTrendingMovies } from "@/services/appwrite";
-import useFetch from "@/services/useFetch";
 import { useRouter } from "expo-router";
-import { ActivityIndicator, FlatList, Image, ScrollView, Text, View } from "react-native";
+import { useCallback, useMemo } from "react";
+import { ActivityIndicator, Dimensions, FlatList, Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+
+const {width: screenWidth} = Dimensions.get('window')
+const MOVIE_ITEM_WIDTH = (screenWidth - 40 -40) / 3
+const MOVIE_ITEM_HEIGHT = 260
 
 export default function Index() {
     const router = useRouter();
@@ -16,92 +21,171 @@ export default function Index() {
         data: trendingMovies,
         loading: trendingLoading,
         error: trendingError,
+        refetch: refetchTrending,
     } = useFetch(getTrendingMovies)
 
     const {
         data: movies,
         loading: moviesLoading,
-        error: moviesError
+        error: moviesError,
+        refetch: refetchMovies,
     } = useFetch(() => fetchMovies({
         query: ''
     }))
 
+    const handleSearchPress = useCallback(() => {
+        router.push('/search')
+    }, [router])
+
+    const handleRetry = useCallback(() => {
+        refetchTrending()
+        refetchMovies()
+    }, [refetchTrending, refetchMovies])
+
+    const renderTrendingItem = useCallback(({item, index}: {item: TrendingMovie; index: number}) => (
+        <TrendingCard movie={item} index={index}/>
+    ), [])
+    
+    const renderMovieItem = useCallback(({item}: {item: Movie}) => (
+        <View style={{width: MOVIE_ITEM_WIDTH}}>
+            <MovieCard {...item}/>
+        </View>
+    ), [])
+
+    const ItemSeperatorComponent = useCallback(() => <View className="w-4"/>, [])
+
+    const keyExtractor = useCallback((item: any) => {
+        return item.id ? item.id.toString() : item.movie_id ? item.movie_id.toString() : Math.random().toString()
+    }, [])
+
+    const getItemLayout = useCallback((_data: ArrayLike<Movie> | null | undefined, index: number) => ({
+        length: MOVIE_ITEM_HEIGHT,
+        offset: MOVIE_ITEM_HEIGHT * Math.floor(index / 3),
+        index,
+    }), [])
+
+    const columnWrapperStyle = useMemo(() => ({
+        justifyContent: 'space-between' as const,
+        paddingHorizontal: 5,
+        marginBottom: 16,
+    }), [])
+
+    const ScrollViewContentStyle = useMemo(() => ({
+        flexGrow: 1,
+        paddingBottom: 10
+    }), [])
+
+    const errorScreenContentStyle = useMemo(() => ({
+        flexGrow: 1,
+        justifyContent: 'center' as const
+    }), [])
+
+    const isLoading = useMemo(()=> trendingLoading || moviesLoading, [trendingLoading, moviesLoading]) 
+    const hasError = useMemo(()=> trendingError || moviesError, [trendingError, moviesError]) 
+    const errorMessage = useMemo(()=> trendingError?.message || moviesError?.message, [trendingError, moviesError])
+    
+    const trendingFlatlistProps = useMemo (() => ({
+        horizontal: true,
+        showsHorizontalScrollIndicator:false,
+        ItemSeperatorComponent:ItemSeperatorComponent,
+        data: trendingMovies || [],
+        renderItem: renderTrendingItem,
+        keyExtractor: keyExtractor,
+        initialNumToRender: 3,
+        maxToRenderPerBatch: 2,
+        windowSize: 5,
+        removeClippedSubviews: false,
+    }), [trendingMovies, ItemSeperatorComponent, renderTrendingItem, keyExtractor])
+
+    const moviesFlatlistProps = useMemo (() => ({
+        scrollEnabled:false,
+        ItemSeperatorComponent:ItemSeperatorComponent,
+        data: movies || [],
+        renderItem: renderMovieItem,
+        keyExtractor,
+        numColumns: 3 as const,
+        columnWrapperStyle,
+        maxToRenderPerBatch: 6,
+        initialNumToRender: 9,
+        removeClippedSubviews: true,
+    }), [movies, renderMovieItem, keyExtractor, columnWrapperStyle])
+
+    if (isLoading) {
+        return (
+            <View className="flex-1 bg-primary justify-center items-center">
+                <Image source={images.bg} className="absolute w-full h-full z-0"/>
+                <ActivityIndicator size='small' color='accent'/>
+                <Text className="text-white mt-4 text-lg">Loading movies...</Text>
+            </View>
+        )
+    }
+
+    if (hasError) {
+        return (
+            <View className="flex-1 bg-primary">
+                <Image source={images.bg} className="absolute w-full h-full z-0"/>
+                <ScrollView
+                    className="flex-1 px-5"
+                    contentContainerStyle={errorScreenContentStyle}
+                >
+                    <View className="items-center py-10">
+                        <Image source={icons.logo} className="w-16 h-12 mb-6 opacity-50"/>
+                        <Text className="text-red-400 text-lg font-semibold mb-2">
+                            Something went wrong
+                        </Text>
+                        <Text className="text-gray-400 text-center mb-6">
+                            {errorMessage || 'Failed to load movies'}
+                        </Text>
+                        <TouchableOpacity
+                            onPress={handleRetry}
+                            className="bg-accent px-6 py-3 rounded-lg"
+                        >
+                            <Text className="text-white font-semibold">Try Again</Text>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+            </View>
+        )
+    }
+
     return (
         <View className="flex-1 bg-primary">
-            <Image source={images.bg} className="absolute w-full w-full z-0" />
+            <Image source={images.bg} className="absolute w-full h-full z-0" />
 
-            <ScrollView className="flex-1 px-5"
-                showsVerticalScrollIndicator={false} contentContainerStyle={{
-                    flexGrow: 1,
-                    paddingBottom: 10
-                }}>
+            <ScrollView 
+                className="flex-1 px-5"
+                showsVerticalScrollIndicator={false} 
+                contentContainerStyle={ScrollViewContentStyle}
+                removeClippedSubviews={true}
+                >
                 <Image source={icons.logo} className="w-12 h-10 mt-20 mb-5 mx-auto" />
 
-                {moviesLoading || trendingLoading ? (
-                    <ActivityIndicator
-                        size="large"
-                        color="#0000ff"
-                        className="mt-10 self-center"
-                    />
-                ) : moviesError || trendingError ? (
-                    <Text className="text-red-500">Error: {moviesError?.message || trendingError?.message}</Text>
-                ) : (
                     <View className="flex-1 mt-5">
                         <SearchBar
-                            onPress={() => router.push("/search")}
+                            onPress={handleSearchPress}
                             placeholder="Search for a movie"
                         />
 
-                        {trendingMovies && (
+                        {/* Trending Movies Section */}
+                        {trendingMovies &&  trendingMovies.length > 0 && (
                             <View className='mt-10'>
                                 <Text className='text-lg text-white font-bold mb-3'>
                                     Trending Movies
                                 </Text>
-                                <FlatList
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    ItemSeparatorComponent={() => <View className='w-4' />}
-                                    data={trendingMovies}
-                                    renderItem={({ item, index }) => (
-                                        <TrendingCard movie={item} index={index} />
-                                    )}
-                                    keyExtractor={(item) => item.movie_id.toString()}
-                                />
+                                <FlatList {...trendingFlatlistProps}/>
                             </View>
                         )}
-                        <>
-                            <Text className="text-lg text-white font-bold mt-5 mb-3">Latest Movies</Text>
-                            <FlatList
-                                data={movies}
-                                renderItem={({ item }) => {
-                                    return (
-                                        <View style={{width: '30%'}}>
-                                            <MovieCard
-                                            id={item.id}
-                                            poster_path={item.poster_path}
-                                            title={item.title}
-                                            vote_average={item.vote_average}
-                                            release_date={item.release_date} adult={false} backdrop_path={""} genre_ids={[]}
-                                            original_language={""} original_title={""} overview={""} popularity={0}
-                                            video={false} vote_count={0} />
-                                        </View>
-                                        
-                                    );
-                                }}
-                                keyExtractor={(item) => item.id.toString()}
-                                numColumns={3}
-                                columnWrapperStyle={{
-                                    justifyContent: 'flex-start',
-                                    gap: 20,
-                                    paddingRight: 5,
-                                    marginBottom: 10
-                                }}
-                                className="mt-2 pb-32"
-                                scrollEnabled={false}
-                            />
-                        </>
-                    </View>
-                )}
+
+                        {/* Latest Movies Section */}
+                        {movies && movies.length > 0 && (
+                            <View className="mt-8">
+                            <Text className="text-lg text-white font-bold mt-5 mb-3">
+                                Latest Movies
+                            </Text>
+                            <FlatList {...moviesFlatlistProps}/>
+                        </View>
+                    )}
+                </View>
             </ScrollView>
         </View>
     );

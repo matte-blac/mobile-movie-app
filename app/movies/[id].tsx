@@ -1,9 +1,9 @@
-import {View, Text, ScrollView, Image, TouchableOpacity} from 'react-native'
-import React from 'react'
-import {router, useLocalSearchParams} from "expo-router";
-import useFetch from "@/services/useFetch";
-import {fetchMovieDetails} from "@/services/api";
-import {icons} from "@/constants/icons";
+import { icons } from "@/constants/icons";
+import useFetch from "@/hooks/useFetch";
+import { fetchMovieDetails } from "@/services/api";
+import { router, useLocalSearchParams } from "expo-router";
+import React from 'react';
+import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 interface MovieInfoProps {
     label: string;
