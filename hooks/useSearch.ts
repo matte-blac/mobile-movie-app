@@ -1,14 +1,9 @@
+import { handleAPIError } from "@/utils/errors"
 import { useCallback, useEffect, useRef, useState } from "react"
-
-
-interface useSearchOptions {
-    debounceMs?: number
-    minQueryLength?: number
-}
 
 export const useSearch = <T>(
     searchFunction: (query: string) => Promise<T>,
-    options: useSearchOptions = {}
+    options: UseSearchOptions = {}
 ) => {
     const {debounceMs = 300, minQueryLength = 2 } = options
 
@@ -20,6 +15,7 @@ export const useSearch = <T>(
     const debounceTimeoutRef = useRef<NodeJS.Timeout>()
     const abortControllerRef = useRef<AbortController>()
     const lastQueryRef = useRef('')
+    const isMountRef = useRef(true)
 
     const executeSearch = useCallback(async (searchQuery: string) => {
         // cancel previous request
@@ -50,16 +46,17 @@ export const useSearch = <T>(
             const results = await searchFunction(searchQuery)
 
             // only update if this still the current query
-            if (searchQuery === lastQueryRef.current) {
+            if (searchQuery === lastQueryRef.current && isMountRef.current) {
                 setData(results)
             }
         } catch (err) {
-            if (searchQuery === lastQueryRef.current && (err as any)?. name !== 'AbortError') {
-                setError(err instanceof Error ? err : new Error('Search failed'))
+            if (searchQuery === lastQueryRef.current && isMountRef.current && (err as any)?. name !== 'AbortError') {
+                const appError = handleAPIError(err)
+                setError(appError)
                 setData(null)
             }
         } finally {
-            if (searchQuery === lastQueryRef.current) {
+            if (searchQuery === lastQueryRef.current && isMountRef.current) {
                 setLoading(false)
             }
         }
@@ -80,13 +77,15 @@ export const useSearch = <T>(
             return
         }
 
-        if (searchQuery.length >= minQueryLength) {
-             setLoading(true)
-        setError(null)
+        if (searchQuery.length >= minQueryLength && isMountRef.current) {
+            setLoading(true)
+            setError(null)
         }
 
         debounceTimeoutRef.current = setTimeout(() => {
-            executeSearch(searchQuery.trim())
+            if (isMountRef.current){
+              executeSearch(searchQuery.trim())  
+            }
         }, debounceMs)
     }, [debounceMs, executeSearch, minQueryLength])
 
@@ -111,9 +110,18 @@ export const useSearch = <T>(
         }
     }, [])
 
+    const retry = useCallback(() => {
+        if (query && query.length >= minQueryLength) {
+            executeSearch(query)
+        }
+    }, [query, minQueryLength, executeSearch])
+
     // cleanup on unmount
     useEffect(() => {
+        isMountRef.current = true
+
         return () => {
+            isMountRef.current = true
             if (debounceTimeoutRef.current) {
                 clearTimeout(debounceTimeoutRef.current)
             }
@@ -130,6 +138,7 @@ export const useSearch = <T>(
         error,
         updateQuery,
         clearSearch,
+        retry,
         isSearching: loading && query.length >= minQueryLength,
     }
 }

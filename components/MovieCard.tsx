@@ -2,12 +2,8 @@ import { icons } from "@/constants/icons";
 import { useSavedMovies } from "@/context/SavedMoviesContext";
 import { removeSavedMovie, saveMovie } from '@/services/appwrite';
 import { Link } from "expo-router";
-import React, { memo, useCallback, useState, useMemo } from 'react';
+import React, { memo, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Text, TouchableOpacity, View } from 'react-native';
-
-interface MovieCardProps extends Movie {
-    showSaveButton?: boolean;
-}
 
 const MovieCard = memo(({ 
     id, 
@@ -43,18 +39,26 @@ const MovieCard = memo(({
         setIsLoading(true);
         try {
             if (isSaved) {
-                await removeSavedMovie(id);
-                removeFromGlobalState(id);
+                 removeFromGlobalState(id);
+                 await removeSavedMovie(id);
             } else {
-                await saveMovie(movieToSave);
                 addSavedMovie(id);
+                await saveMovie(movieToSave);
             }
         } catch (error) {
             console.error('Error saving movie:', error);
             const errorMessage = error instanceof Error ? error.message : 'An error occurred';
 
+
+            if (isSaved) {
+                addSavedMovie(id);
+            } else {
+                removeFromGlobalState(id);
+            }
+
             if (errorMessage.includes('already saved')) {
                 Alert.alert('Already Saved', 'This movie is already in your saved list.');
+                addSavedMovie(id)
             } else if (errorMessage.includes('not authorized')) {
                 Alert.alert('Permission Error', 'Please make sure you are logged in and have permission to save movies.');
             } else {

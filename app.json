@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "FlixView",
-    "slug": "mobile-movie-app",
+    "name": "Movie Explorer",
+    "slug": "movie-explorer-app",
     "version": "1.0.2",
     "orientation": "portrait",
     "icon": "assets/images/logo.png",
@@ -17,7 +17,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.matteblac.flix"
+      "package": "com.movie.explorer"
     },
     "web": {
       "bundler": "metro",
@@ -35,7 +35,8 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

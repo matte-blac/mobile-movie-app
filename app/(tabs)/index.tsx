@@ -52,7 +52,8 @@ export default function Index() {
         </View>
     ), [])
 
-    const ItemSeperatorComponent = useCallback(() => <View className="w-4"/>, [])
+    const TrendingItemSeparator = useCallback(() => <View className="w-4"/>, []);
+    const MovieItemSeparator = useCallback(() => <View className="w-4"/>, []);
 
     const keyExtractor = useCallback((item: any) => {
         return item.id ? item.id.toString() : item.movie_id ? item.movie_id.toString() : Math.random().toString()
@@ -87,19 +88,20 @@ export default function Index() {
     const trendingFlatlistProps = useMemo (() => ({
         horizontal: true,
         showsHorizontalScrollIndicator:false,
-        ItemSeperatorComponent:ItemSeperatorComponent,
+        ItemSeperatorComponent: TrendingItemSeparator,
         data: trendingMovies || [],
         renderItem: renderTrendingItem,
         keyExtractor: keyExtractor,
         initialNumToRender: 3,
         maxToRenderPerBatch: 2,
         windowSize: 5,
+        contentContainerStyle: { paddingLeft: 0, paddingRight: 16 },
         removeClippedSubviews: false,
-    }), [trendingMovies, ItemSeperatorComponent, renderTrendingItem, keyExtractor])
+    }), [trendingMovies, renderTrendingItem, keyExtractor])
 
     const moviesFlatlistProps = useMemo (() => ({
         scrollEnabled:false,
-        ItemSeperatorComponent:ItemSeperatorComponent,
+        ItemSeperatorComponent: MovieItemSeparator,
         data: movies || [],
         renderItem: renderMovieItem,
         keyExtractor,

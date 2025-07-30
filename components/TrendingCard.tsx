@@ -1,14 +1,16 @@
 import { images } from "@/constants/images";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { Link } from "expo-router";
-import React, { memo, useCallback, useState } from 'react';
+import React, { memo, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native';
 
 const TrendingCard = memo(({ movie: {movie_id, title, poster_url}, index}: TrendingCardProps) => {
     const [imageLoading, setImageLoading] = useState(true)
     const [imageError, setImageError] = useState(false)
 
-    const imageUrl = poster_url?.replace('https://api.themoviedb.org/t/p/w500/', 'https://image.tmdb.org/t/p/w500/');
+    const imageUrl = useMemo(() => {
+        return poster_url?.replace('https://api.themoviedb.org/t/p/w500/', 'https://image.tmdb.org/t/p/w500/');
+    }, [poster_url]) 
 
     const handleImageLoad = useCallback(() => {
         setImageLoading(false)
@@ -20,9 +22,14 @@ const TrendingCard = memo(({ movie: {movie_id, title, poster_url}, index}: Trend
         setImageError(true)
     }, [])
 
+    const shouldShowImage = useMemo(() => {
+        return imageUrl && !imageError
+    }, [imageUrl, imageError])
+
     return (
-        <Link href={`/movies/${movie_id}`} asChild>
-            <TouchableOpacity className={'w-32 relative pl-5'}>
+        <TouchableOpacity className="mr-4">
+            <Link href={`/movies/${movie_id}`} asChild>
+            <TouchableOpacity className={'w-32 h-48 relative'}>
                 <Image
                     source={{ uri: imageUrl }}
                     style={{ width: 128, height: 192, borderRadius: 8 }}
@@ -31,13 +38,13 @@ const TrendingCard = memo(({ movie: {movie_id, title, poster_url}, index}: Trend
                     onError={handleImageError}
                 />
 
-                {imageLoading && (
+                {shouldShowImage && imageLoading && (
                     <View className="absolute inset-0 bg-dark-200 rounded-lg items-center justify-center">
                         <ActivityIndicator color='accent' size='small'/>
                     </View>
                 )}
 
-                {imageError && !imageLoading && (
+                {!shouldShowImage || imageError && !imageLoading && (
                     <View className="absolute inset-0 bg-dark-200 rounded-lg items-center justify-center">
                         <Text className="text-gray-400 text-xs text-center px-2" numberOfLines={2}>
                             {title}
@@ -63,6 +70,8 @@ const TrendingCard = memo(({ movie: {movie_id, title, poster_url}, index}: Trend
                 </Text>
             </TouchableOpacity>
         </Link>
+        </TouchableOpacity>
+        
     )
 })
 

@@ -1,3 +1,4 @@
+import { createAuthError, handleAPIError } from "@/utils/errors";
 import { Account, Client, Databases, ID, Query } from "react-native-appwrite";
 
 const DATABASE_ID = process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!;
@@ -16,8 +17,22 @@ const getCurrentUserId = async (): Promise<string> => {
         const user = await account.get()
         return user.$id
     } catch (error) {
-        throw new Error('User not authenticated')
+        throw createAuthError ('User not authenticated', 'NOT_AUTHENTICATED')
     }
+}
+
+const handleAppwriteError = (error: any, operation: string) => {
+    console.error(`${operation} error:`, error)
+
+    if (error.code === 401) {
+        throw createAuthError('Authentication required', 'UNAUTHORIZED')
+    }
+
+    if (error.code === 403) {
+        throw createAuthError('Access forbidden', 'FORBIDDEN')
+    }
+
+    throw handleAPIError(error)
 }
 
 export const updateSearchCount = async (query: string, movie: Movie) => {
@@ -47,8 +62,7 @@ export const updateSearchCount = async (query: string, movie: Movie) => {
             })
         }
     } catch (error) {
-        console.log(error);
-        throw error;
+        handleAppwriteError(error, 'Update search count')
     }
 }
 
@@ -60,17 +74,13 @@ export const getTrendingMovies = async (): Promise<TrendingMovie[] | undefined> 
         ])
         return result.documents as unknown as TrendingMovie[];
     } catch (error) {
-        console.log(error);
-        return undefined;
+        handleAppwriteError(error, 'Get trending movies')
+        return []
     }
 }
 
 export const saveMovie = async (movie: Movie) => {
     try {
-        // const existingMovie = await database.listDocuments(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, [
-        //     Query.equal('movie_id', movie.id)
-        // ])
-        
         const userId = await getCurrentUserId()
 
         const existingMovie = await database.listDocuments(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, [
@@ -79,7 +89,10 @@ export const saveMovie = async (movie: Movie) => {
         ])
 
         if (existingMovie.documents.length > 0) {
-            throw new Error("Movie is already saved");
+            throw handleAPIError({
+                message: 'Movie is already saved',
+                code: 'ALREADY_EXISTS'
+            })
         }
 
         await database.createDocument(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, ID.unique(), {
@@ -94,8 +107,8 @@ export const saveMovie = async (movie: Movie) => {
 
         return true;
     } catch (error) {
-        console.error('Error saving movie:', error);
-        throw error
+        handleAppwriteError(error, 'Save movie')
+        return false
     }
 }
 
@@ -114,8 +127,8 @@ export const removeSavedMovie = async (movieId: number) => {
         }
         return true;
     } catch (error) {
-        console.error('Error removing saved movie:', error)
-        throw error
+       handleAppwriteError(error, 'Remove saved movie')
+        return false
     }
 }
 
@@ -132,8 +145,8 @@ export const getSavedMovies = async () => {
 
         return result.documents;
     } catch (error) {
-        console.error('Error fetching saved movies:', error);
-        throw error;
+        handleAppwriteError(error, 'Get saved movies')
+        return []
     }
 }
 
@@ -149,7 +162,7 @@ export const isMovieSaved = async (movieId: number): Promise<boolean> => {
 
         return result.documents.length > 0;
     } catch (error) {
-        console.error('Error checking if movie is saved:', error);
+        handleAppwriteError(error, 'Error checking if movie is saved')
         return false
     }
 }
@@ -170,7 +183,7 @@ export const clearAllSavedMovies = async () => {
         await Promise.all(deletePromises)
         return true
     } catch (error) {
-        console.error('Error clearing saved movies:', error)
-        throw error;
+        handleAppwriteError(error, 'Clear all saved movies')
+        return false
     }
 }
