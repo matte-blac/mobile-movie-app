@@ -218,6 +218,7 @@ interface AuthContextType {
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+  refreshSession: () => Promise<void>
 }
 
 interface SavedMoviesContextType {

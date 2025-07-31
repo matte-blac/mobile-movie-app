@@ -12,6 +12,53 @@ export const client = new Client()
 const database = new Databases(client);
 const account = new Account(client)
 
+export const SessionUtils = {
+    async getCurrentSession() {
+        try {
+            return await account.getSession('current')
+        } catch (error) {
+            throw createAuthError('No active session', 'NO_SESSION')
+        }
+    },
+     
+    async refreshSession() {
+        try {
+            const currentSession = await account.getSession('current')
+
+            const expiryTime = new Date(currentSession.expire)
+            const now = new Date()
+            const oneHour = 60 * 60 * 1000
+
+            if (expiryTime.getTime() - now.getTime() < oneHour) {
+                const user = await account.get()
+                return {refreshed: true, user}
+            }
+
+            return {refreshed: false, session: currentSession}
+        } catch (error) {
+            throw createAuthError('Failed to refresh session', 'REFRESH_FAILED')
+        }
+    },
+
+    async validateSession() {
+        try {
+            const user = await account.get()
+            const session = await account.getSession('current')
+
+            const expiryTime = new Date(session.expire)
+            const now = new Date()
+
+            if (expiryTime <= now) {
+                throw createAuthError('Session expired', 'SESSION_EXPIRED')
+            }
+
+            return {user, session, isValid: true}
+        } catch (error) {
+            throw createAuthError('Invalid session', 'INVALID_SESSION')
+        }
+    }
+}
+
 const getCurrentUserId = async (): Promise<string> => {
     try {
         const user = await account.get()
@@ -32,7 +79,56 @@ const handleAppwriteError = (error: any, operation: string) => {
         throw createAuthError('Access forbidden', 'FORBIDDEN')
     }
 
+    if (error.code === 429) {
+        throw handleAPIError({
+            message: 'Too many requests. Please try again later',
+            code: 'RATE_LIMITED'
+        })
+    }
+
+    if (error.type === 'document_not_found') {
+        throw handleAPIError({
+            message: 'Resource not found',
+            code: 'NOT_FOUND'
+        })
+    }
+
+    if (error.type === 'document_already_exists') {
+        throw handleAPIError({
+            message: 'Resource already exists',
+            code: 'ALREADY_EXISTS'
+        })
+    }
+
     throw handleAPIError(error)
+}
+
+const withSessionValidation = async <T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    retryCount: number = 0
+): Promise<T> => {
+    const maxRetries = 10
+
+    try {
+        await SessionUtils.validateSession()
+        return await operation()
+    } catch (error: any) {
+        if (
+            (error.code === 'INVALID_REASON' || error.code === 'SESSION_EXPIRED' || error.code === 'UNAUTHORIZED') &&
+            retryCount < maxRetries
+        ) {
+            try {
+                await SessionUtils.refreshSession()
+                return await withSessionValidation(operation, operationName, retryCount + 1)
+            } catch (refreshError) {
+                throw createAuthError('Session refresh failed. Please log in again', 'SESSION_REFRESH_FAILED')
+            }
+        }
+
+        handleAppwriteError(error, operationName)
+        throw error
+    }
 }
 
 export const updateSearchCount = async (query: string, movie: Movie) => {
@@ -74,13 +170,14 @@ export const getTrendingMovies = async (): Promise<TrendingMovie[] | undefined> 
         ])
         return result.documents as unknown as TrendingMovie[];
     } catch (error) {
-        handleAppwriteError(error, 'Get trending movies')
+        console.warn('Failed to get trending movies:', error)
         return []
     }
 }
 
-export const saveMovie = async (movie: Movie) => {
-    try {
+export const saveMovie = async (movie: Movie): Promise<boolean> => {
+
+    return withSessionValidation(async () =>{ 
         const userId = await getCurrentUserId()
 
         const existingMovie = await database.listDocuments(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, [
@@ -106,15 +203,11 @@ export const saveMovie = async (movie: Movie) => {
         })
 
         return true;
-    } catch (error) {
-        handleAppwriteError(error, 'Save movie')
-        return false
-    }
+    }, 'Save movie')
 }
 
-export const removeSavedMovie = async (movieId: number) => {
-    try {
-
+export const removeSavedMovie = async (movieId: number): Promise<boolean> => {
+    return withSessionValidation(async () =>{
         const userId = await getCurrentUserId()
         
         const result = await database.listDocuments(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, [
@@ -126,14 +219,11 @@ export const removeSavedMovie = async (movieId: number) => {
             await database.deleteDocument(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, result.documents[0].$id);
         }
         return true;
-    } catch (error) {
-       handleAppwriteError(error, 'Remove saved movie')
-        return false
-    }
+    }, 'Remove saved movie')
 }
 
-export const getSavedMovies = async () => {
-    try {
+export const getSavedMovies = async (): Promise<SavedMovie[]> => {
+    return withSessionValidation(async () =>{
 
         const userId = await getCurrentUserId()
 
@@ -143,15 +233,12 @@ export const getSavedMovies = async () => {
             Query.limit(100)
         ])
 
-        return result.documents;
-    } catch (error) {
-        handleAppwriteError(error, 'Get saved movies')
-        return []
-    }
+        return result.documents as unknown as SavedMovie[]
+    }, 'Get saved movies')
 }
 
 export const isMovieSaved = async (movieId: number): Promise<boolean> => {
-    try {
+    return withSessionValidation(async () =>{
 
         const userId = await getCurrentUserId()
 
@@ -161,14 +248,11 @@ export const isMovieSaved = async (movieId: number): Promise<boolean> => {
         ]);
 
         return result.documents.length > 0;
-    } catch (error) {
-        handleAppwriteError(error, 'Error checking if movie is saved')
-        return false
-    }
+    }, 'Check if movie is saved')
 }
 
-export const clearAllSavedMovies = async () => {
-    try {
+export const clearAllSavedMovies = async (): Promise<boolean> => {
+    return withSessionValidation(async () =>{
 
         const userId = await getCurrentUserId()
 
@@ -176,14 +260,47 @@ export const clearAllSavedMovies = async () => {
             Query.equal('user_id', userId)
         ])
 
-        const deletePromises = result.documents.map(doc => 
-            database.deleteDocument(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, doc.$id)
-        )
-
-        await Promise.all(deletePromises)
+        const batchSize = 10
+        for (let i = 0; i < result.documents.length; i += batchSize) {
+            const batch = result.documents.slice(i, i + batchSize)
+            const deletePromises = batch.map(doc => 
+                database.deleteDocument(DATABASE_ID, SAVED_MOVIES_COLLECTION_ID, doc.$id) 
+            )
+            await Promise.all(deletePromises)
+        }
         return true
-    } catch (error) {
-        handleAppwriteError(error, 'Clear all saved movies')
-        return false
+    }, 'Clear all saved movies')
+}
+
+export const AuthService = {
+    async checkAuthStatus() {
+        try {
+            const {user, session, isValid} = await SessionUtils.validateSession()
+            return {isAuthenticated: isValid, user, session}
+        } catch (error) {
+            return {isAuthenticated: false, user: null, session: null}
+        }
+    },
+
+    async refreshUserSession() {
+        try {
+            const result = await SessionUtils.refreshSession()
+            if (result.refreshed) {
+                return { success: true, user: result.user}
+            }
+            return { success: true, user: result.session}
+        } catch (error) {
+            return {success: false, error}
+        }
+    },
+
+    async logout() {
+        try {
+            await account.deleteSession('current')
+            return {success: true}
+        } catch (error) {
+            console.error('Logout error:', error)
+            return {success: false, error}
+        }
     }
 }
