@@ -26,10 +26,18 @@ const TrendingCard = memo(({ movie: {movie_id, title, poster_url}, index}: Trend
         return imageUrl && !imageError
     }, [imageUrl, imageError])
 
+    const rankingNumber = useMemo(() => index + 1, [index])
+
+    const maskElement = useMemo(() => (
+        <Text className='font-bold text-white text-6xl'>
+            {rankingNumber}
+        </Text>
+    ), [rankingNumber])
+
     return (
         <TouchableOpacity className="mr-4">
             <Link href={`/movies/${movie_id}`} asChild>
-            <TouchableOpacity className={'w-32 h-48 relative'}>
+            <TouchableOpacity className={'w-32 relative'}>
                 <Image
                     source={{ uri: imageUrl }}
                     style={{ width: 128, height: 192, borderRadius: 8 }}
@@ -52,12 +60,8 @@ const TrendingCard = memo(({ movie: {movie_id, title, poster_url}, index}: Trend
                     </View>
                 )}
 
-                <View className='absolute -left-0.5 px-2 py-1 rounded-full'>
-                    <MaskedView maskElement={
-                        <Text className='font-bold text-white text-6xl'>
-                            {index + 1}
-                        </Text>
-                    }>
+                <View className='absolute -left-3.5 px-2 py-1 rounded-full'>
+                    <MaskedView maskElement={maskElement}>
                         <Image
                             source={images.rankingGradient}
                             className='size-14'
@@ -65,13 +69,20 @@ const TrendingCard = memo(({ movie: {movie_id, title, poster_url}, index}: Trend
                         />
                     </MaskedView>
                 </View>
-                <Text className='text-sm font-bold mt-2 text-light-200' numberOfLines={2}>
+                <Text className='text-sm font-bold mt-2 text-light-100' numberOfLines={2}>
                     {title}
                 </Text>
             </TouchableOpacity>
         </Link>
         </TouchableOpacity>
         
+    )
+}, (prevProps, nextProps) => {
+    return (
+        prevProps.movie.movie_id === nextProps.movie.movie_id &&
+        prevProps.movie.title === nextProps.movie.title &&
+        prevProps.movie.poster_url === nextProps.movie.poster_url &&
+        prevProps.index === nextProps.index
     )
 })
 

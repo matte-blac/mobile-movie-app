@@ -23,7 +23,7 @@ export const SavedMoviesProvider: React.FC<SavedMoviesProviderProps> = ({childre
     const [loading, setLoading] = useState(false)
     const {user, isAuthenticated} = useAuth()
 
-    const refreshSavedMovies = useCallback (async () => {
+    const refreshSavedMovies = useCallback(async () => {
         if (!isAuthenticated || !user) {
             setSavedMoviesIds(new Set())
             setSavedMovies([])
@@ -49,14 +49,9 @@ export const SavedMoviesProvider: React.FC<SavedMoviesProviderProps> = ({childre
     }, [isAuthenticated, user])
     
     const addSavedMovie = useCallback((movieId: number) => {
-        setSavedMoviesIds(prev => {
-            const newSet = new Set([...prev, movieId])
-            return newSet
-        })
-        setTimeout(() => {
-            refreshSavedMovies()
-        }, 100)
-    }, [refreshSavedMovies])
+        setSavedMoviesIds(prev => new Set([...prev, movieId]))
+        // No need for setTimeout here - let the API call handle the refresh
+    }, [])
 
     const removeSavedMovie = useCallback((movieId: number) => {
         setSavedMoviesIds(prev => {
@@ -71,12 +66,16 @@ export const SavedMoviesProvider: React.FC<SavedMoviesProviderProps> = ({childre
         return savedMoviesIds.has(movieId)
     }, [savedMoviesIds])
 
+    // Initial load of saved movies
     useEffect(() => {
-        refreshSavedMovies();
-    }, [refreshSavedMovies])
+        if (isAuthenticated) {
+            refreshSavedMovies();
+        }
+    }, [isAuthenticated, refreshSavedMovies])
 
+    // Sync savedMoviesIds when savedMovies changes
     useEffect(() => {
-        if (savedMovies.length > 0) {
+        if (savedMovies.length >= 0) { // Changed from > 0 to >= 0 to handle empty arrays
             const movieIds = new Set(savedMovies.map(movie => movie.movie_id))
             setSavedMoviesIds(movieIds)
         }
@@ -85,6 +84,7 @@ export const SavedMoviesProvider: React.FC<SavedMoviesProviderProps> = ({childre
     const contextValue: SavedMoviesContextType = {
         savedMoviesIds,
         savedMovies,
+        loading,
         refreshSavedMovies,
         addSavedMovie,
         removeSavedMovie,

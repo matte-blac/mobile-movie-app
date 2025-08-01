@@ -1,4 +1,4 @@
-// interface.d.ts - Global type declarations
+// interface.d.ts - Global type declarations with optimizations
 
 // API Response Types
 interface TMDBResponse<T> {
@@ -196,18 +196,37 @@ type AsyncOperation<T> = {
   data: T | null;
   loading: boolean;
   error: AppError | null;
-  refetch: () => Promise<void>;
+  refetch: (bypassCache?: boolean) => Promise<void>;
   reset: () => void;
+  isStale?: boolean;
+  lastFetched?: number;
 };
 
-// Hook Types
+// Hook Types with enhanced options
 interface UseFetchOptions {
   autoFetch?: boolean;
+  cacheKey?: string;
+  cacheDuration?: number; // in milliseconds
 }
 
 interface UseSearchOptions {
   debounceMs?: number;
   minQueryLength?: number;
+  cacheResults?: boolean;
+}
+
+// Enhanced Search Hook Return Type
+interface UseSearchReturn<T> {
+  query: string;
+  data: T | null;
+  loading: boolean;
+  error: Error | null;
+  updateQuery: (newQuery: string) => void;
+  clearSearch: () => void;
+  retry: () => void;
+  isSearching: boolean;
+  hasMore?: boolean;
+  loadMore?: () => void;
 }
 
 // Context Types
@@ -224,29 +243,31 @@ interface AuthContextType {
 interface SavedMoviesContextType {
   savedMoviesIds: Set<number>;
   savedMovies: SavedMovie[];
+  loading: boolean;
   refreshSavedMovies: () => Promise<void>;
   addSavedMovie: (movieId: number) => void;
   removeSavedMovie: (movieId: number) => void;
   isMovieSaved: (movieId: number) => boolean;
 }
 
+// Enhanced Component Props with Performance Optimizations
 interface LoadingProps {
     message?: string;
     size?: 'small' |'large';
     showBackground?: boolean
     classname?: string;
-  }
+}
 
-  interface ErrorScreenProps {
+interface ErrorScreenProps {
     error: AppError | Error;
     onRetry?: () => void;
     title?: string;
     icon?: any;
     showLogo?: boolean;
     className?: string;
-  }
+}
 
-  interface EmptyStateProps {
+interface EmptyStateProps {
     icon: any;
     title: string;
     subtitle?: string;
@@ -254,11 +275,185 @@ interface LoadingProps {
     iconClassName?: string;
     titleClassName?: string;
     subtitleClassName?: string;
-  }
+}
 
-  interface ScreenHeaderProps {
+interface ScreenHeaderProps {
     title?: string;
     subtitle?: string;
     showLogo?: boolean;
     className?: string;
-  }
+}
+
+// Performance Optimization Types
+interface MemoizedComponentProps {
+  shouldUpdate?: (prevProps: any, nextProps: any) => boolean;
+}
+
+interface VirtualizedListProps {
+  getItemLayout?: (data: any, index: number) => {length: number, offset: number, index: number};
+  removeClippedSubviews?: boolean;
+  maxToRenderPerBatch?: number;
+  updateCellsBatchingPeriod?: number;
+  windowSize?: number;
+  initialNumToRender?: number;
+}
+
+// Cache Management Types
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+  expiry?: number;
+}
+
+interface CacheOptions {
+  maxSize?: number;
+  defaultTTL?: number; // Time to live in milliseconds
+  enablePersistence?: boolean;
+}
+
+// Enhanced Search Types with Pagination
+interface PaginatedSearchResult<T> {
+  data: T[];
+  currentPage: number;
+  totalPages: number;
+  totalResults: number;
+  hasMore: boolean;
+}
+
+interface SearchPaginationOptions {
+  itemsPerPage?: number;
+  preloadNextPage?: boolean;
+  maxCachedPages?: number;
+}
+
+// Network State Types
+interface NetworkState {
+  isConnected: boolean;
+  isInternetReachable: boolean | null;
+  type: string | null;
+}
+
+// Image Loading Types
+interface ImageLoadState {
+  loading: boolean;
+  error: boolean;
+  loaded: boolean;
+}
+
+// Gesture and Animation Types
+interface GestureConfig {
+  enableSwipeGestures?: boolean;
+  swipeThreshold?: number;
+  animationDuration?: number;
+}
+
+interface AnimationConfig {
+  useNativeDriver?: boolean;
+  duration?: number;
+  easing?: any;
+}
+
+// Analytics and Tracking Types
+interface AnalyticsEvent {
+  eventName: string;
+  parameters?: Record<string, any>;
+  timestamp?: number;
+}
+
+interface UserInteraction {
+  type: 'tap' | 'swipe' | 'scroll' | 'search' | 'save' | 'remove';
+  target: string;
+  metadata?: Record<string, any>;
+}
+
+// State Management Types
+interface AppState {
+  auth: AuthState;
+  movies: MoviesState;
+  search: SearchState;
+  cache: CacheState;
+  network: NetworkState;
+}
+
+interface AuthState {
+  user: any | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  error: string | null;
+  sessionExpiry: number | null;
+}
+
+interface MoviesState {
+  trending: TrendingMovie[];
+  latest: Movie[];
+  saved: SavedMovie[];
+  details: Record<string, MovieDetails>;
+  loading: Record<string, boolean>;
+  errors: Record<string, string>;
+}
+
+interface SearchState {
+  query: string;
+  results: Movie[];
+  loading: boolean;
+  error: string | null;
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
+  history: string[];
+}
+
+interface CacheState {
+  entries: Record<string, CacheEntry<any>>;
+  size: number;
+  lastCleanup: number;
+}
+
+// Form and Validation Enhanced Types
+interface FormFieldState {
+  value: string;
+  error: string | null;
+  touched: boolean;
+  dirty: boolean;
+  valid: boolean;
+}
+
+interface FormState {
+  fields: Record<string, FormFieldState>;
+  isValid: boolean;
+  isSubmitting: boolean;
+  submitCount: number;
+  errors: Record<string, string>;
+}
+
+// Theme and Styling Types
+interface ThemeColors {
+  primary: string;
+  secondary: string;
+  accent: string;
+  background: string;
+  surface: string;
+  text: string;
+  error: string;
+  success: string;
+  warning: string;
+}
+
+interface ThemeConfig {
+  colors: ThemeColors;
+  typography: Record<string, any>;
+  spacing: Record<string, number>;
+  borderRadius: Record<string, number>;
+  shadows: Record<string, any>;
+}
+
+// Accessibility Types
+interface AccessibilityProps {
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  accessibilityRole?: string;
+  accessibilityState?: Record<string, boolean>;
+  testID?: string;
+}

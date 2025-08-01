@@ -1,9 +1,9 @@
 import { icons } from "@/constants/icons";
-import React from "react";
+import React, { memo } from "react";
 import { Image, Text, View } from "react-native";
 
 
-const ScreenHeader : React.FC<ScreenHeaderProps> = ({
+const ScreenHeader: React.FC<ScreenHeaderProps> = memo(({
     title,
     subtitle,
     showLogo = true,
@@ -12,7 +12,10 @@ const ScreenHeader : React.FC<ScreenHeaderProps> = ({
     return (
         <View className={className}>
             {showLogo && (
-                <Image source={icons.logo} className="w-12 h-10"/>
+                <View className="relative">
+                    <Image source={icons.logo} className="w-12 h-10"/>
+                    <View/>
+                </View>
             )}
             {title && (
                 <View className="items-center ml-3">
@@ -27,7 +30,16 @@ const ScreenHeader : React.FC<ScreenHeaderProps> = ({
                 </View>
             )}
         </View>
-    )
-}
+    );
+}, (prevProps, nextProps) => {
+    return (
+        prevProps.title === nextProps.title &&
+        prevProps.subtitle === nextProps.subtitle &&
+        prevProps.showLogo === nextProps.showLogo &&
+        prevProps.className === nextProps.className
+    );
+});
+
+ScreenHeader.displayName = 'ScreenHeader';
 
 export default ScreenHeader
