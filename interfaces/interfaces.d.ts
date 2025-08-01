@@ -1,5 +1,3 @@
-// interface.d.ts - Global type declarations with optimizations
-
 // API Response Types
 interface TMDBResponse<T> {
   results: T[];
@@ -96,12 +94,180 @@ interface SavedMovie {
   saved_at: string;
 }
 
+// Enhanced Hook Options
+interface UseFetchOptions {
+  autoFetch?: boolean;
+  cacheKey?: string;
+  cacheDuration?: number;
+  enableRetry?: boolean;
+  retryAttempts?: number;
+  retryDelay?: number;
+  retryBackoff?: number;
+  staleTime?: number;
+  backgroundRefetch?: boolean;
+  dedupe?: boolean;
+  onSuccess?: (data: any) => void;
+  onError?: (error: AppError) => void;
+  onStaleData?: (data: any) => void;
+}
+
+interface UseSearchOptions {
+  debounceMs?: number;
+  minQueryLength?: number;
+  cacheResults?: boolean;
+  enableRetry?: boolean;
+  retryAttempts?: number;
+  retryDelay?: number;
+  enableCache?: boolean;
+  cacheTTL?: number;
+  onSuccess?: (data: any, query: string) => void;
+  onError?: (error: Error, query: string) => void;
+  backgroundRefetch?: boolean;
+  maxConcurrentRequests?: number;
+}
+
+// Enhanced Hook Return Types
+interface AsyncOperation<T> {
+  data: T | null;
+  loading: boolean;
+  error: AppError | null;
+  refetch: (bypassCache?: boolean) => Promise<void>;
+  reset: () => void;
+  isStale?: boolean;
+  lastFetched?: number;
+  refetchInBackground?: () => Promise<void>;
+  clearCache?: () => void;
+}
+
+interface UseSearchReturn<T> {
+  query: string;
+  data: T | null;
+  loading: boolean;
+  error: Error | null;
+  updateQuery: (newQuery: string) => void;
+  clearSearch: () => void;
+  retry: () => void;
+  isSearching: boolean;
+  hasMore?: boolean;
+  loadMore?: () => void;
+  clearCache?: () => void;
+  getCachedQueries?: () => string[];
+  getSimilarQueries?: (query: string) => string[];
+  cancelSearch?: () => void;
+}
+
+// Cache Management Types
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+  expiry: number;
+  isStale?: boolean;
+}
+
+interface CacheOptions {
+  maxSize?: number;
+  defaultTTL?: number;
+  enablePersistence?: boolean;
+  staleTime?: number;
+}
+
+interface CacheStats {
+  size: number;
+  keys: string[];
+  entries: Array<{
+    key: string;
+    timestamp: number;
+    expiry: number;
+    isStale: boolean;
+    age: number;
+  }>;
+}
+
+// Request Configuration Types
+interface RetryConfig {
+  maxRetries: number;
+  baseDelay: number;
+  maxDelay: number;
+  backoffFactor: number;
+}
+
+interface RequestOptions extends RequestInit {
+  retryConfig?: Partial<RetryConfig>;
+  cacheKey?: string;
+  cacheTTL?: number;
+  staleTime?: number;
+  enableCache?: boolean;
+  enableRetry?: boolean;
+}
+
+// Search Cache Types
+interface SearchCacheEntry<T> {
+  data: T;
+  timestamp: number;
+  expiry: number;
+  query: string;
+}
+
+// Network State and Performance Types
+interface NetworkMonitor {
+  isOnline: boolean;
+  connectionType: string;
+  effectiveType: string;
+  downlink: number;
+  rtt: number;
+}
+
+interface RequestMetrics {
+  duration: number;
+  retryCount: number;
+  cacheHit: boolean;
+  size: number;
+  url: string;
+  method: string;
+  status?: number;
+}
+
+// Error Types with Enhanced Information
+interface AppError extends Error {
+  code?: string;
+  statusCode?: number;
+  details?: any;
+  retryable?: boolean;
+  timestamp?: number;
+  requestId?: string;
+}
+
+declare class APIError extends Error implements AppError {
+  code?: string;
+  statusCode?: number;
+  details?: any;
+  retryable?: boolean;
+  timestamp?: number;
+  requestId?: string;
+
+  constructor(
+    message: string, 
+    code?: string, 
+    statusCode?: number, 
+    details?: any,
+    retryable?: boolean
+  );
+}
+
+declare class AuthError extends Error implements AppError {
+  code?: string;
+  details?: any;
+  timestamp?: number;
+
+  constructor(message: string, code?: string, details?: any);
+}
+
+// Component Props Types (existing)
 interface TrendingCardProps {
   movie: TrendingMovie;
   index: number;
 }
 
-// Component Props Types
 interface MovieCardProps extends Movie {
   showSaveButton?: boolean;
 }
@@ -134,34 +300,86 @@ interface ProfileItemProps {
   isDangerous?: boolean;
 }
 
-// Error Types
-interface AppError extends Error {
-  code?: string;
-  statusCode?: number;
-  details?: any;
+// Enhanced Loading and Error States
+interface LoadingState {
+  isLoading: boolean;
+  error: AppError | null;
+  progress?: number;
+  message?: string;
 }
 
-declare class APIError extends Error implements AppError {
-  code?: string;
-  statusCode?: number;
-  details?: any;
-
-  constructor(message: string, code?: string, statusCode?: number, details?: any);
+interface LoadingProps {
+  message?: string;
+  size?: 'small' | 'large';
+  showBackground?: boolean;
+  className?: string;
+  progress?: number;
 }
 
-declare class AuthError extends Error implements AppError {
-  code?: string;
-  details?: any;
-
-  constructor(message: string, code?: string, details?: any);
+interface ErrorScreenProps {
+  error: AppError | Error;
+  onRetry?: () => void;
+  title?: string;
+  icon?: any;
+  showLogo?: boolean;
+  className?: string;
+  showDetails?: boolean;
 }
 
-// Global Error Utility Functions
+interface EmptyStateProps {
+  icon: any;
+  title: string;
+  subtitle?: string;
+  className?: string;
+  iconClassName?: string;
+  titleClassName?: string;
+  subtitleClassName?: string;
+  action?: {
+    label: string;
+    onPress: () => void;
+  };
+}
+
+interface ScreenHeaderProps {
+  title?: string;
+  subtitle?: string;
+  showLogo?: boolean;
+  className?: string;
+  rightComponent?: React.ReactNode;
+}
+
+// Context Types with Enhanced Features
+interface AuthContextType {
+  user: any | null;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, name: string) => Promise<void>;
+  logout: () => Promise<void>;
+  isAuthenticated: boolean;
+  refreshSession: () => Promise<void>;
+  sessionExpiry?: Date;
+  lastActivity?: Date;
+}
+
+interface SavedMoviesContextType {
+  savedMoviesIds: Set<number>;
+  savedMovies: SavedMovie[];
+  loading: boolean;
+  refreshSavedMovies: () => Promise<void>;
+  addSavedMovie: (movieId: number) => void;
+  removeSavedMovie: (movieId: number) => void;
+  isMovieSaved: (movieId: number) => boolean;
+  clearAllSavedMovies: () => Promise<void>;
+  syncStatus: 'idle' | 'syncing' | 'error';
+}
+
+// Global Utility Function Declarations
 declare function createAPIError(
   message: string,
   statusCode?: number,
   code?: string,
-  details?: any
+  details?: any,
+  retryable?: boolean
 ): APIError;
 
 declare function createAuthError(
@@ -186,193 +404,38 @@ declare function isNetworkError(error: any): boolean;
 
 declare function shouldRetry(error: AppError): boolean;
 
-// Utility Types
-type LoadingState = {
-  isLoading: boolean;
-  error: AppError | null;
-};
-
-type AsyncOperation<T> = {
-  data: T | null;
-  loading: boolean;
-  error: AppError | null;
-  refetch: (bypassCache?: boolean) => Promise<void>;
-  reset: () => void;
-  isStale?: boolean;
-  lastFetched?: number;
-};
-
-// Hook Types with enhanced options
-interface UseFetchOptions {
-  autoFetch?: boolean;
-  cacheKey?: string;
-  cacheDuration?: number; // in milliseconds
+// Performance and Analytics Types
+interface PerformanceMetrics {
+  renderTime: number;
+  apiLatency: number;
+  cacheHitRate: number;
+  errorRate: number;
+  retryRate: number;
 }
 
-interface UseSearchOptions {
-  debounceMs?: number;
-  minQueryLength?: number;
-  cacheResults?: boolean;
-}
-
-// Enhanced Search Hook Return Type
-interface UseSearchReturn<T> {
-  query: string;
-  data: T | null;
-  loading: boolean;
-  error: Error | null;
-  updateQuery: (newQuery: string) => void;
-  clearSearch: () => void;
-  retry: () => void;
-  isSearching: boolean;
-  hasMore?: boolean;
-  loadMore?: () => void;
-}
-
-// Context Types
-interface AuthContextType {
-  user: any | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
-  logout: () => Promise<void>;
-  isAuthenticated: boolean;
-  refreshSession: () => Promise<void>
-}
-
-interface SavedMoviesContextType {
-  savedMoviesIds: Set<number>;
-  savedMovies: SavedMovie[];
-  loading: boolean;
-  refreshSavedMovies: () => Promise<void>;
-  addSavedMovie: (movieId: number) => void;
-  removeSavedMovie: (movieId: number) => void;
-  isMovieSaved: (movieId: number) => boolean;
-}
-
-// Enhanced Component Props with Performance Optimizations
-interface LoadingProps {
-    message?: string;
-    size?: 'small' |'large';
-    showBackground?: boolean
-    classname?: string;
-}
-
-interface ErrorScreenProps {
-    error: AppError | Error;
-    onRetry?: () => void;
-    title?: string;
-    icon?: any;
-    showLogo?: boolean;
-    className?: string;
-}
-
-interface EmptyStateProps {
-    icon: any;
-    title: string;
-    subtitle?: string;
-    className?: string;
-    iconClassName?: string;
-    titleClassName?: string;
-    subtitleClassName?: string;
-}
-
-interface ScreenHeaderProps {
-    title?: string;
-    subtitle?: string;
-    showLogo?: boolean;
-    className?: string;
-}
-
-// Performance Optimization Types
-interface MemoizedComponentProps {
-  shouldUpdate?: (prevProps: any, nextProps: any) => boolean;
-}
-
-interface VirtualizedListProps {
-  getItemLayout?: (data: any, index: number) => {length: number, offset: number, index: number};
-  removeClippedSubviews?: boolean;
-  maxToRenderPerBatch?: number;
-  updateCellsBatchingPeriod?: number;
-  windowSize?: number;
-  initialNumToRender?: number;
-}
-
-// Cache Management Types
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-  expiry?: number;
-}
-
-interface CacheOptions {
-  maxSize?: number;
-  defaultTTL?: number; // Time to live in milliseconds
-  enablePersistence?: boolean;
-}
-
-// Enhanced Search Types with Pagination
-interface PaginatedSearchResult<T> {
-  data: T[];
-  currentPage: number;
-  totalPages: number;
-  totalResults: number;
-  hasMore: boolean;
-}
-
-interface SearchPaginationOptions {
-  itemsPerPage?: number;
-  preloadNextPage?: boolean;
-  maxCachedPages?: number;
-}
-
-// Network State Types
-interface NetworkState {
-  isConnected: boolean;
-  isInternetReachable: boolean | null;
-  type: string | null;
-}
-
-// Image Loading Types
-interface ImageLoadState {
-  loading: boolean;
-  error: boolean;
-  loaded: boolean;
-}
-
-// Gesture and Animation Types
-interface GestureConfig {
-  enableSwipeGestures?: boolean;
-  swipeThreshold?: number;
-  animationDuration?: number;
-}
-
-interface AnimationConfig {
-  useNativeDriver?: boolean;
-  duration?: number;
-  easing?: any;
-}
-
-// Analytics and Tracking Types
 interface AnalyticsEvent {
   eventName: string;
   parameters?: Record<string, any>;
   timestamp?: number;
+  userId?: string;
+  sessionId?: string;
 }
 
 interface UserInteraction {
   type: 'tap' | 'swipe' | 'scroll' | 'search' | 'save' | 'remove';
   target: string;
   metadata?: Record<string, any>;
+  timestamp: number;
 }
 
-// State Management Types
+// Advanced State Management
 interface AppState {
   auth: AuthState;
   movies: MoviesState;
   search: SearchState;
   cache: CacheState;
   network: NetworkState;
+  performance: PerformanceState;
 }
 
 interface AuthState {
@@ -381,6 +444,7 @@ interface AuthState {
   loading: boolean;
   error: string | null;
   sessionExpiry: number | null;
+  lastActivity: number | null;
 }
 
 interface MoviesState {
@@ -390,6 +454,7 @@ interface MoviesState {
   details: Record<string, MovieDetails>;
   loading: Record<string, boolean>;
   errors: Record<string, string>;
+  lastUpdated: Record<string, number>;
 }
 
 interface SearchState {
@@ -403,21 +468,41 @@ interface SearchState {
     hasMore: boolean;
   };
   history: string[];
+  suggestions: string[];
+  recentQueries: string[];
 }
 
 interface CacheState {
   entries: Record<string, CacheEntry<any>>;
   size: number;
   lastCleanup: number;
+  hitRate: number;
+  missRate: number;
 }
 
-// Form and Validation Enhanced Types
+interface NetworkState {
+  isConnected: boolean;
+  isInternetReachable: boolean | null;
+  type: string | null;
+  effectiveType: string | null;
+  downlink: number;
+  rtt: number;
+}
+
+interface PerformanceState {
+  metrics: PerformanceMetrics;
+  monitoring: boolean;
+  alerts: string[];
+}
+
+// Form and Validation Types
 interface FormFieldState {
   value: string;
   error: string | null;
   touched: boolean;
   dirty: boolean;
   valid: boolean;
+  validating?: boolean;
 }
 
 interface FormState {
@@ -426,9 +511,11 @@ interface FormState {
   isSubmitting: boolean;
   submitCount: number;
   errors: Record<string, string>;
+  isDirty: boolean;
+  isValidating: boolean;
 }
 
-// Theme and Styling Types
+// Theme and Accessibility
 interface ThemeColors {
   primary: string;
   secondary: string;
@@ -449,7 +536,6 @@ interface ThemeConfig {
   shadows: Record<string, any>;
 }
 
-// Accessibility Types
 interface AccessibilityProps {
   accessibilityLabel?: string;
   accessibilityHint?: string;
