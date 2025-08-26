@@ -19,11 +19,11 @@ interface CacheEntry<T> {
 // Cache manager class
 class RequestCache {
     private cache = new Map<string, CacheEntry<any>>();
-    private readonly defaultTTL = 5 * 60 * 1000; // 5 minutes
+    private readonly defaultTTL = 5 * 60 * 1000;
     private readonly maxSize = 100;
 
     set<T>(key: string, data: T, ttl?: number): void {
-        // Clean up if cache is too large
+        // clean up if cache is too large
         if (this.cache.size >= this.maxSize) {
             this.cleanup();
         }
@@ -36,7 +36,7 @@ class RequestCache {
         const entry = this.cache.get(key);
         if (!entry) return null;
 
-        // Check if expired
+        // check if expired
         if (Date.now() > entry.expiry) {
             this.cache.delete(key);
             return null;
@@ -64,14 +64,14 @@ class RequestCache {
         const now = Date.now();
         const entries = Array.from(this.cache.entries());
         
-        // Remove expired entries first
+        // remove expired entries first
         entries.forEach(([key, entry]) => {
             if (now > entry.expiry) {
                 this.cache.delete(key);
             }
         });
 
-        // If still too large, remove oldest entries
+        // if still too large, remove oldest entries
         if (this.cache.size >= this.maxSize) {
             const sortedEntries = entries
                 .filter(([key]) => this.cache.has(key))
@@ -83,10 +83,10 @@ class RequestCache {
     }
 }
 
-// Global cache instance
+// global cache instance
 const requestCache = new RequestCache();
 
-// Retry configuration
+// retry configuration
 interface RetryConfig {
     maxRetries: number;
     baseDelay: number;
@@ -101,7 +101,7 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
     backoffFactor: 2
 };
 
-// Request options interface
+// request options interface
 interface RequestOptions extends RequestInit {
     retryConfig?: Partial<RetryConfig>;
     cacheKey?: string;
@@ -111,24 +111,24 @@ interface RequestOptions extends RequestInit {
     enableRetry?: boolean;
 }
 
-// Sleep utility for delays
+// sleep utility for delays
 const sleep = (ms: number): Promise<void> => 
     new Promise(resolve => setTimeout(resolve, ms));
 
-// Calculate retry delay with exponential backoff and jitter
+// calculate retry delay with exponential backoff and jitter
 const calculateRetryDelay = (attempt: number, config: RetryConfig): number => {
     const exponentialDelay = config.baseDelay * Math.pow(config.backoffFactor, attempt - 1);
     const clampedDelay = Math.min(exponentialDelay, config.maxDelay);
     
-    // Add jitter to prevent thundering herd
+    // add jitter to prevent thundering herd
     const jitter = Math.random() * 0.1 * clampedDelay;
     return clampedDelay + jitter;
 };
 
-// Check if error is retryable
+// check if error is retryable
 const isRetryableError = (error: any): boolean => {
     if (!error.response) {
-        // Network errors are retryable
+        // network errors are retryable
         return error.name === 'TypeError' && error.message.includes('fetch');
     }
     
@@ -136,7 +136,7 @@ const isRetryableError = (error: any): boolean => {
     return [408, 429, 500, 502, 503, 504].includes(status);
 };
 
-// Enhanced API request function with retry logic and caching
+// enhanced API request function with retry logic and caching
 const apiRequest = async <T>(
     endpoint: string, 
     options: RequestOptions = {}
@@ -145,7 +145,7 @@ const apiRequest = async <T>(
         retryConfig = {},
         cacheKey,
         cacheTTL,
-        staleTime = 2 * 60 * 1000, // 2 minutes
+        staleTime = 2 * 60 * 1000,
         enableCache = true,
         enableRetry = true,
         ...requestOptions
@@ -153,7 +153,7 @@ const apiRequest = async <T>(
 
     const config = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
     
-    // Check cache first
+    // check cache first
     if (enableCache && cacheKey) {
         const cachedData = requestCache.get<T>(cacheKey);
         if (cachedData) {
@@ -164,7 +164,7 @@ const apiRequest = async <T>(
                 return cachedData;
             }
             
-            // Stale-while-revalidate: return stale data but trigger background refresh
+            // stale-while-revalidate: return stale data but trigger background refresh
             const backgroundRefresh = async () => {
                 try {
                     const freshData = await performRequest<T>(endpoint, requestOptions, config, enableRetry);
@@ -179,10 +179,10 @@ const apiRequest = async <T>(
         }
     }
 
-    // Perform the request
+    // perform the request
     const data = await performRequest<T>(endpoint, requestOptions, config, enableRetry);
     
-    // Cache successful response
+    // cache successful response
     if (enableCache && cacheKey) {
         requestCache.set(cacheKey, data, cacheTTL);
     }
@@ -190,7 +190,7 @@ const apiRequest = async <T>(
     return data;
 };
 
-// Perform the actual request with retry logic
+// perform the actual request with retry logic
 const performRequest = async <T>(
     endpoint: string,
     requestOptions: RequestInit,
@@ -218,7 +218,7 @@ const performRequest = async <T>(
                     }
                 };
                 
-                // Check if we should retry
+                // check if we should retry
                 if (attempt < maxAttempts && enableRetry && isRetryableError(error)) {
                     const delay = calculateRetryDelay(attempt, retryConfig);
                     console.log(`Request failed (attempt ${attempt}/${maxAttempts}), retrying in ${delay}ms...`);
@@ -233,7 +233,7 @@ const performRequest = async <T>(
         } catch (error) {
             lastError = error;
             
-            // Handle network errors
+            // handle network errors
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
                 const networkError = {
                     message: 'Network error. Please check your internet connection.',
@@ -250,7 +250,7 @@ const performRequest = async <T>(
                 throw handleAPIError(networkError);
             }
             
-            // If it's already a handled API error, don't retry
+            // if it's already a handled API error, don't retry
             throw error;
         }
     }
@@ -258,7 +258,7 @@ const performRequest = async <T>(
     throw lastError;
 };
 
-// Enhanced movie fetching with caching and retry
+// enhanced movie fetching with paination support
 export const fetchMovies = async ({ 
     query, 
     page = 1,
@@ -279,8 +279,8 @@ export const fetchMovies = async ({
     try {
         const data = await apiRequest<TMDBResponse<Movie>>(endpoint, {
             cacheKey,
-            cacheTTL: query ? 10 * 60 * 1000 : 30 * 60 * 1000, // Search: 10min, Discover: 30min
-            staleTime: query ? 5 * 60 * 1000 : 15 * 60 * 1000, // Search: 5min, Discover: 15min
+            cacheTTL: query ? 10 * 60 * 1000 : 30 * 60 * 1000,
+            staleTime: query ? 5 * 60 * 1000 : 15 * 60 * 1000,
             ...options
         });
         
@@ -291,7 +291,119 @@ export const fetchMovies = async ({
     }
 };
 
-// Enhanced movie details fetching
+// enhanced movie details fetching with full pagination metadata
+export const fetchMoviePagination = async ({
+    query,
+    page = 1,
+    options = {}
+}: {
+    movieId: string, 
+    options: Partial<RequestOptions>
+}): Promise<PaginatedMoviesResponse> => {
+    const endpoint = query
+        ? `${TMDB_CONFIG.BASE_URL}/search/movie?query=${encodeURIComponent(query)}&page=${page}`
+        : `${TMDB_CONFIG.BASE_URL}/discover/movie?sort_by=popularity.desc&page=${page}`
+
+    const cacheKey = query
+        ? `paginated-search-movies-${query}-${page}`
+        : `paginated-discover-movies-${page}`
+    
+    try {
+        const data = await apiRequest<TMDBResponse<Movie>>(endpoint, {
+            cacheKey,
+            cacheTTL: query ? 10 * 60 * 1000: 30 * 60 * 1000,
+            staleTime: query ? 5 * 60 * 1000: 15 * 60 * 1000,
+            ...options
+        });
+
+        // validate response structure
+        const currentPage = Math.max(1, data.page || page)
+        const totalPages = Math.max(1, data.total_pages || 1)
+        const totalResults = Math.max(0, data.total_results || 0)
+        const movies = data.results || []
+
+        return {
+            movies,
+            pagination: {
+                currentPage,
+                totalPages,
+                totalResults,
+                hasNextPage: currentPage < totalPages,
+                hasPrevPage: currentPage > 1
+            }
+        }
+    } catch (error) {
+        console.error('Failed to fetch movies with pagination', error);
+        throw error;
+    }
+};
+
+// batch fetch multiple pages at once
+export const fetchMoviesBatch = async ({
+    query,
+    startPage = 1,
+    pageCount = 3,
+    options = {}
+}: {
+    query: string
+    startPage?: number
+    pageCount?: number
+    options?: Partial<RequestOptions>
+}): Promise<{
+    movies: Movie[]
+    pagination: {
+        startPage: number
+        endPage: number
+        totalPages: number
+        totalResults: number
+        hasMorePages: boolean
+    }
+}> => {
+    try {
+        // fetch multiple pages concurrently
+        const pagePromises = Array.from({length: pageCount}, (_, index) => 
+            fetchMoviePagination({
+                query,
+                page: startPage + index,
+                options
+            })
+        )
+
+        const results = await Promise.allSettled(pagePromises)
+        const successfulResults = results
+            .filter((result): result is PromiseFulfilledResult<PaginatedMoviesResponse> => 
+                result.status === 'fulfilled'
+            )
+            .map(result => result.value)
+
+        if (successfulResults.length === 0) {
+            throw new Error('All page requests failed')
+        }
+
+        // combine all movies from successful requests
+        const allMovies = successfulResults.flatMap(result => result.movies)
+
+        // use pagination info from the first successful result
+        const firstResult = successfulResults[0]
+        const endPage = startPage + successfulResults.length - 1
+
+        return {
+            movies: allMovies,
+            pagination: {
+                startPage,
+                endPage,
+                totalPages: firstResult.pagination.totalPages,
+                totalResults: firstResult.pagination.totalResults,
+                hasMorePages: endPage < firstResult.pagination.totalPages
+            }
+        }
+    } catch (error) {
+        console.error('Failed t fetch movies batch:', error)
+        throw error
+    }
+}
+
+// enhanced movie details fetching
 export const fetchMovieDetails = async (
     movieId: string, 
     options: Partial<RequestOptions> = {}
@@ -302,8 +414,8 @@ export const fetchMovieDetails = async (
     try {
         return await apiRequest<MovieDetails>(endpoint, {
             cacheKey,
-            cacheTTL: 60 * 60 * 1000, // 1 hour cache for movie details
-            staleTime: 30 * 60 * 1000, // 30 minutes stale time
+            cacheTTL: 60 * 60 * 1000, 
+            staleTime: 30 * 60 * 1000, 
             ...options
         });
     } catch (error) {
@@ -323,7 +435,50 @@ export const getPlaceholderImageUrl = (title: string, width: number = 342, heigh
     return `https://placehold.co/${width}x${height}/1a1a1a/ffffff.png?text=${encodedTitle}`;
 };
 
-// Cache management utilities
+// enhanced search with built-in pagination
+export const searchMoviesWithPagination = async (
+    query: string,
+    page: number = 1,
+    options: Partial<RequestOptions> = {}
+): Promise<PaginatedMoviesResponse> => {
+    if (!query.trim()) {
+        throw new Error('Search query cannot be empty')
+    }
+
+    return fetchMoviePagination({
+        query: query.trim(),
+        page,
+        options: {
+            cacheTTL: 5 * 60 * 1000,
+            staleTime: 2 * 60 * 1000,
+            ...options
+        }
+    })
+}
+
+// preload next page for smooth pagination
+export const preloadNextPage = async (
+    query: string,
+    currentPage: number,
+    options: Partial<RequestOptions> = {}
+): Promise<void> => {
+    try {
+        const nextPage = currentPage + 1
+        await fetchMoviePagination({
+            query,
+            page: nextPage,
+            options: {
+                cacheTTL: 10 * 60 * 1000,
+                ...options
+            }
+        })
+        console.log(`Preload page ${nextPage} for query: ${query}`)
+    } catch (error) {
+        console.warn('Failed to preload next page:', error)
+    }
+}
+
+// cache management utilities
 export const cacheUtils = {
     clearCache: () => requestCache.clear(),
     removeFromCache: (key: string) => requestCache.delete(key),
@@ -336,6 +491,32 @@ export const cacheUtils = {
         } catch (error) {
             console.error('Preload failed:', error);
             throw error;
+        }
+    },
+    // clear pagination caches for a specific query
+    clearPaginationCache: (query: string) => {
+        const keysToDelete: string[] = []
+        requestCache['cache'].forEach((_, key) => {
+            if (key.includes(`-movies-${query}-`) || key.includes(`paginated-`)) {
+                keysToDelete.push(key)
+            }
+        })
+        keysToDelete.forEach(key => requestCache.delete(key))
+    },
+
+    // get cache statistics
+    getCacheStats: () => {
+        const cache = requestCache['cache']
+        const now = Date.now()
+        const entries = Array.from(cache.entries())
+
+        return {
+            totalEntries: cache.size,
+            expiredEntries: entries.filter(([_, entry]) => now > entry.expiry).length,
+            staleEntries: entries.filter(([_, entry]) =>
+                 now - entry.timestamp > 2 * 60 * 1000 && now <= entry.expiry).length,
+            freshEntries: entries.filter(([_, entry]) => 
+                now - entry.timestamp <= 2 * 60 * 1000 && now <= entry.expiry).length,
         }
     }
 };

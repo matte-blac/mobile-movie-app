@@ -543,3 +543,23 @@ interface AccessibilityProps {
   accessibilityState?: Record<string, boolean>;
   testID?: string;
 }
+
+//  enhanced pagination response
+interface PaginatedMoviesResponse {
+    movies: Movie[];
+    pagination: {
+        currentPage: number;
+        totalPages: number;
+        totalResults: number;
+        hasNextPage: boolean;
+        hasPrevPage: boolean;
+    };
+}
+
+interface PaginationState {
+    currentPage: number;
+    totalPages: number;
+    totalResults: number;
+    hasNextPage: boolean;
+    loadingMore: boolean;
+}

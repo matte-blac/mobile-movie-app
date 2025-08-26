@@ -10,9 +10,8 @@ import { ActivityIndicator, Dimensions, FlatList, Image, Text, View } from 'reac
 const {width: screenWidth} = Dimensions.get('window')
 const ITEM_WIDTH = (screenWidth - 40 - 32) / 3
 const ITEM_HEIGHT = 260
-const ITEMS_PER_PAGE = 20
 
-// Memoized components
+// memoized components
 const SearchHeader = memo(({ searchQuery, onChangeText }: {
     searchQuery: string;
     onChangeText: (text: string) => void;

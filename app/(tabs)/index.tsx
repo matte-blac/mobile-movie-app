@@ -5,17 +5,17 @@ import { icons } from "@/constants/icons";
 import { images } from "@/constants/images";
 import { useSavedMovies } from "@/context/SavedMoviesContext";
 import useFetch from "@/hooks/useFetch";
-import { fetchMovies } from "@/services/api";
+import { fetchMoviePagination, preloadNextPage } from "@/services/api";
 import { getTrendingMovies } from "@/services/appwrite";
 import { useRouter } from "expo-router";
-import { useCallback, useMemo, memo, useEffect } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Dimensions, FlatList, Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 const {width: screenWidth} = Dimensions.get('window')
 const MOVIE_ITEM_WIDTH = (screenWidth - 40 -40) / 3
 const MOVIE_ITEM_HEIGHT = 260
 
-// Memoized components
+// memoized components
 const ErrorScreen = memo(({ errorMessage, onRetry }: { errorMessage: string; onRetry: () => void }) => (
     <View className="flex-1 bg-primary">
         <Image source={images.bg} className="absolute w-full h-full z-0"/>
@@ -45,10 +45,44 @@ const ErrorScreen = memo(({ errorMessage, onRetry }: { errorMessage: string; onR
 const LoadingScreen = memo(() => (
     <View className="flex-1 bg-primary justify-center items-center">
         <Image source={images.bg} className="absolute w-full h-full z-0"/>
-        <ActivityIndicator size='small' color='#ab8bff'/>
+        <ActivityIndicator size='small' color='light-accent'/>
         <Text className="text-white mt-4 text-lg">Loading movies...</Text>
     </View>
 ));
+
+const LoadMoreButton = memo(({onPress, loading, disabled}: {
+    onPress: () => void
+    loading: boolean
+    disabled?: boolean
+}) => (
+    <View className="items-center py-6">
+        <TouchableOpacity
+            onPress={onPress}
+            disabled={loading || disabled}
+            className={`px-8 py-3 rouded-full ${loading || disabled ? 'bg-gray-600 opacity-50': 'bg-accent opacity-90'}`}
+            activeOpacity={0.8}
+        >
+            {loading ? (
+                <View className="flex-row items-center">
+                    <ActivityIndicator size='small' color='#fff' />
+                    <Text className="text-white font-semibold ml-2">Loading...</Text>
+                </View>
+            ) : (
+                <Text className="text-white font-semibold">
+                    {disabled ? 'No More Movies' : 'Load More Movies'}
+                </Text>
+            )}
+        </TouchableOpacity>
+    </View>
+))
+
+const PaginatedInfo = memo(({pagination}: {pagination: PaginationState}) => (
+    <View className="items-center py-2">
+        <Text className="text-gray-400 text-sm">
+            Page {pagination.currentPage} of {pagination.totalPages} • {pagination.totalResults} total movies
+        </Text>
+    </View>
+))
 
 const TrendingSection = memo(({ trendingMovies, renderTrendingItem, keyExtractor }: {
     trendingMovies: TrendingMovie[];
@@ -86,10 +120,20 @@ const TrendingSection = memo(({ trendingMovies, renderTrendingItem, keyExtractor
     );
 });
 
-const MoviesSection = memo(({ movies, renderMovieItem, keyExtractor }: {
-    movies: Movie[];
-    renderMovieItem: any;
-    keyExtractor: any;
+const MoviesSection = memo(({
+    movies,
+    renderMovieItem,
+    keyExtractor,
+    onLoadMore,
+    pagination,
+    showPaginationInfo = true
+}: {
+    movies: Movie[]
+    renderMovieItem: any
+    keyExtractor: any
+    onLoadMore: () => void
+    pagination: PaginationState
+    showPaginationInfo?: boolean
 }) => {
     const columnWrapperStyle = useMemo(() => ({
         justifyContent: 'space-between' as const,
@@ -119,10 +163,28 @@ const MoviesSection = memo(({ movies, renderMovieItem, keyExtractor }: {
 
     return (
         <View className="mt-8">
-            <Text className="text-lg text-white font-bold mt-5 mb-3">
-                Latest Movies
-            </Text>
+            <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-lg text-white font-bold">
+                    Latest Movies
+                </Text>
+                <Text className="text-sm text-gray-400">
+                    {movies.length} movies
+                </Text>
+            </View>
+
             <FlatList {...flatlistProps}/>
+
+            {showPaginationInfo && (
+                <PaginatedInfo pagination={pagination} />
+            )}
+
+             {pagination.hasNextPage && (
+                <LoadMoreButton
+                        onPress={onLoadMore}
+                        loading={pagination.loadingMore}
+                        disabled={!pagination.hasNextPage}
+                />
+             )}
         </View>
     );
 });
@@ -130,6 +192,20 @@ const MoviesSection = memo(({ movies, renderMovieItem, keyExtractor }: {
 export default function Index() {
     const router = useRouter();
     const { refreshSavedMovies } = useSavedMovies();
+
+    // state for movies and pagination
+    const [allMovies, setAllMovies] = useState<Movie[]>([])
+    const [pagination, setPagination] = useState<PaginationState>({
+        currentPage: 0,
+        totalPages: 1,
+        totalResults: 0,
+        hasNextPage: true,
+        loadingMore: false
+    })
+
+    // ref to prevent duplicate requests
+    const loadingRef = useRef(false)
+    const preloadTimeoutRef = useRef<NodeJS.Timeout>()
 
     const {
         data: trendingMovies,
@@ -139,27 +215,132 @@ export default function Index() {
     } = useFetch(getTrendingMovies)
 
     const {
-        data: movies,
+        data: initialData,
         loading: moviesLoading,
         error: moviesError,
         refetch: refetchMovies,
-    } = useFetch(() => fetchMovies({
-        query: ''
-    }))
+    } = useFetch(() => fetchMoviePagination({
+        query: '',
+        page: 1
+    }), {
+        cacheKey: 'home-movies-page-1',
+        cacheDuration: 30 * 60 * 1000
+    })
 
-    // Refresh saved movies when component mounts to ensure consistency
+    // initialize movies and pagination on first load
+    useEffect(() => {
+        if (initialData && initialData.movies.length > 0) {
+            setAllMovies(initialData.movies)
+            setPagination({
+                currentPage: initialData.pagination.currentPage,
+                totalPages: initialData.pagination.totalPages,
+                totalResults: initialData.pagination.totalResults,
+                hasNextPage: initialData.pagination.hasNextPage,
+                loadingMore: false
+            })
+
+            // preload next page for smooth experience
+            if (initialData.pagination.hasNextPage) {
+                preloadTimeoutRef.current = setTimeout(() => {
+                    preloadNextPage('', 1)
+                }, 200)
+            }
+        }
+    }, [initialData])
+
+    // refresh saved movies when component mounts to ensure consistency
     useEffect(() => {
         refreshSavedMovies();
     }, [refreshSavedMovies]);
+
+    // cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (preloadTimeoutRef.current) {
+                clearTimeout(preloadTimeoutRef.current)
+            }
+        }
+    }, [])
 
     const handleSearchPress = useCallback(() => {
         router.push('/search')
     }, [router])
 
     const handleRetry = useCallback(() => {
+        setAllMovies([])
+        setPagination({
+            currentPage: 0,
+            totalPages: 1,
+            totalResults: 0,
+            hasNextPage: true,
+            loadingMore: false
+        })
         refetchTrending()
         refetchMovies()
     }, [refetchTrending, refetchMovies])
+
+    const handleLoadMore = useCallback(async () => {
+        if (loadingRef.current || pagination.loadingMore || !pagination.hasNextPage) {
+            return
+        }
+
+        loadingRef.current = true
+        setPagination(prev => ({...prev, loadingMore: true}))
+
+        try {
+            const nextPage = pagination.currentPage + 1
+            const result = await fetchMoviePagination({
+                query: '',
+                page: nextPage
+            })
+
+            if (result && result.movies.length > 0) {
+                // filter out any duplicates
+                const uniqueNewMovies = result.movies.filter(
+                    newMovie => !allMovies.some(existingMovie => existingMovie.id === newMovie.id)
+                )
+
+                if (uniqueNewMovies.length > 0) {
+                    setAllMovies(prev => [...prev, ...uniqueNewMovies])
+                    setPagination({
+                        currentPage: result.pagination.currentPage,
+                        totalPages: result.pagination.totalPages,
+                        totalResults: result.pagination.totalResults,
+                        hasNextPage: result.pagination.hasNextPage,
+                        loadingMore: false
+                    })
+
+                    // preload next page if available
+                    if (result.pagination.hasNextPage) {
+                        preloadTimeoutRef.current = setTimeout(() => {
+                            preloadNextPage('', result.pagination.currentPage)
+                        }, 1000)
+                    }
+                } else {
+                    // no new unique movies, this is the end
+                    setPagination(prev => ({
+                        ...prev,
+                        hasNextPage: false,
+                        loadingMore: false
+                    }))
+                }
+            } else {
+                setPagination(prev => ({
+                        ...prev,
+                        hasNextPage: false,
+                        loadingMore: false
+                    }))
+            }
+        } catch (error) {
+            console.error('Failed to load more movies:', error)
+            setPagination(prev => ({
+                ...prev,
+                loadingMore: false
+            }))
+        } finally {
+            loadingRef.current = false
+        }
+    }, [pagination, allMovies])
 
     const renderTrendingItem = useCallback(({item, index}: {item: TrendingMovie; index: number}) => (
         <TrendingCard movie={item} index={index}/>
@@ -218,9 +399,12 @@ export default function Index() {
                     />
 
                     <MoviesSection 
-                        movies={movies || []}
+                        movies={allMovies}
                         renderMovieItem={renderMovieItem}
                         keyExtractor={keyExtractor}
+                        onLoadMore={handleLoadMore}
+                        pagination={pagination}
+                        showPaginationInfo={true}
                     />
                 </View>
             </ScrollView>
