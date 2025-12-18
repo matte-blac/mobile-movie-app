@@ -563,3 +563,15 @@ interface PaginationState {
     hasNextPage: boolean;
     loadingMore: boolean;
 }
+
+interface Genre {
+  id: number;
+  name: string;
+}
+
+interface GenreFilterProps {
+  genres: Genre[];
+  selectedGenreId: number | null;
+  onGenreSelect: (genreId: number | null) => void;
+  loading?: boolean;
+}

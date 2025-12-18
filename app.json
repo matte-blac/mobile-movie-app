@@ -1,15 +1,19 @@
 {
   "expo": {
     "name": "Movie Explorer",
-    "slug": "movie-explorer-app",
+    "slug": "mobile-movie-app",
     "version": "1.0.2",
     "orientation": "portrait",
     "icon": "assets/images/logo.png",
     "scheme": "movies",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.movie.explorer",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -51,7 +55,10 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/1cf3a01c-f5f6-4e95-8dfe-d672dbf48fdd"
+      "url": "https://u.expo.dev/1cf3a01c-f5f6-4e95-8dfe-d672dbf48fdd",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
     }
   }
 }
