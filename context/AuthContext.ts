@@ -1,4 +1,5 @@
 import { client } from "@/services/appwrite";
+import { generateAndSendOTP, verifyOTP } from "@/services/otp";
 import { router } from "expo-router";
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useContext, useEffect, useState } from "react";
@@ -7,8 +8,8 @@ import { Account, ID, Models } from "react-native-appwrite";
 interface AuthContextType {
     user: Models.User<Models.Preferences> | null;
     loading: boolean;
-    login: (email: string, password: string) => Promise<void>;
-    register: (email: string, password: string, name: string) => Promise<void>;
+    sendOTP: (email: string) => Promise<{success: boolean; message: string; resendDelay: number}>
+    verifyOTPAndLogin: (email: string, otp: string, name?: string) => Promise<void>
     logout: () => Promise<void>;
     refreshSession: () => Promise<void>;
     isAuthenticated: boolean;
@@ -29,6 +30,27 @@ const STORAGE_KEYS = {
     SESSION: 'user_session',
     USER_DATA: 'user_data'
 };
+
+// generate consistent password from email for otp auth
+const generatePasswordFromEmail = (email: string): string => {
+    // use a consistent algorith to generate password from email
+    const normalized = email.toLowerCase().trim()
+
+    // create a deterministic but secure password
+    let hash = 0
+    for (let i = 0; i < normalized.length; i++) {
+        const char = normalized.charCodeAt(i)
+        hash = ((hash << 5) - hash) + char
+        hash = hash & hash // convert to 32bit int
+    }
+    
+    // make hash positive and convert to string
+    const hashStr = Math.abs(hash).toString()
+
+    const password = `Otp${hashStr}Auth${normalized.length}Key!`
+
+        return password
+}
 
 // session management utilities
 const SessionManager = {
@@ -166,61 +188,122 @@ export const AuthProvider = ({ children }: {children: React.ReactNode}) => {
     const refreshSession = async () => {
        try {
         await attemptSessionRefresh()
-       } catch (error) {
-        console.error('Session refresh error:', error)
-        throw error
+       } catch (RefreshError) {
+        console.error('Session refresh error:', RefreshError)
+        throw RefreshError
        } 
     }
 
-    const login = async (email: string, password: string) => {
+    // OTP authentication methods
+    const sendOTP = async (email: string) => {
         try {
             setLoading(true)
-
-            const session = await account.createEmailPasswordSession(email, password)
-            const currentUser = await account.get()
-
-            await SessionManager.saveSession({
-                userId: currentUser.$id,
-                sessionId: session.$id,
-                expires: session.expire
-            })
-
-            await SessionManager.saveUserData(currentUser)
-            setUser(currentUser)
-
-            router.replace('/(tabs)')
+            const result = await generateAndSendOTP(email)
+            return result
         } catch (error) {
-            console.error('Login error:', error)
+            console.error('Send OTP error:', error)
             throw error
         } finally {
             setLoading(false)
         }
     }
 
-    const register = async (email: string, password: string, name: string) => {
+    const verifyOTPAndLogin = async (email: string, otp: string, name?: string) => {
         try {
-            setLoading(true)
-            
-            await account.create(ID.unique(), email, password, name)
+        setLoading(true)
 
-            await login(email, password)
-            // router.replace('/(tabs)')
-        } catch (error) {
-            console.error('Registration error:', error)
-            throw error
-        } finally {
-            setLoading(false)
+        // verify custom OTP first
+        const verificationResult = await verifyOTP(email, otp)
+        if (!verificationResult.success) {
+            throw new Error('OTP verification failed')
         }
+
+        // clean up any existing sessions
+        try {
+            await account.deleteSession('current')
+        } catch (error) {
+            console.log('No session to delete', error)
+        }
+
+        // generate consistent password from email
+        const password = generatePasswordFromEmail(email)
+        const userId = ID.unique()
+        
+        let isNewUser = false
+
+        try {
+            // create a new account
+            await account.create(
+                userId,
+                email,
+                password,
+                name || undefined
+            )
+
+            console.log('New account created')
+            isNewUser = true
+        } catch (createError: any) {
+            if (createError.code === 409) {
+                console.log('Existing user, proceeding to login')
+                isNewUser = false
+            } else {
+                console.error('Account creation error:', createError)
+                throw new Error('Failed to create account. Please try again.')
+            }
+        }
+
+        // create email session with the consistent password
+        try {
+            await account.createEmailPasswordSession(email, password)
+            console.log('Session created successfully')
+        } catch (sessionError: any) {
+            console.error('Session creation error:', sessionError)
+            throw new Error('Failed to create session. Please try again.')
+        }
+
+        // if existing user needs to update their name
+        if (!isNewUser && name) {
+            try {
+                await account.updateName(name)
+                console.log('Name updated for existing user')
+            } catch (nameError) {
+                console.warn('Could not update name:', nameError)
+            }
+        } 
+        
+        const currentUser = await account.get()
+        const session = await account.getSession('current')
+
+        await SessionManager.saveSession({
+            userId: currentUser.$id,
+            sessionId: session.$id,
+            expires: session.expire
+        })
+
+        await SessionManager.saveUserData(currentUser)
+        setUser(currentUser)
+
+        router.replace('/(tabs)')
+    } catch (VerifyError: any) {
+        console.error('Verify OTP and login error:', VerifyError)
+
+        // clean up any session on error
+        try {
+            await account.deleteSession('current')
+        } catch (cleanupError) {
+            console.log('No session to clean up:', cleanupError)
+        }
+        throw VerifyError
+    } finally {
+        setLoading(false)
     }
+}
 
     const logout = async () => {
         try {
             setLoading(true)
-
             await account.deleteSession('current')
-
             await SessionManager.clearSession()
-
             setUser(null)
             router.replace('/login')
         } catch (error) {
@@ -237,8 +320,8 @@ export const AuthProvider = ({ children }: {children: React.ReactNode}) => {
     const value: AuthContextType = {
         user,
         loading,
-        login,
-        register,
+        sendOTP,
+        verifyOTPAndLogin,
         logout,
         refreshSession,
         isAuthenticated: !!user,

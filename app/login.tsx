@@ -1,8 +1,9 @@
 import { icons } from '@/constants/icons';
 import { images } from '@/constants/images';
 import { useAuth } from '@/context/AuthContext';
-import { CommonValidationRules, validateField, ValidationResult } from '@/utils/validation';
-import React, { useCallback, useRef, useState } from 'react';
+import { OTP_UI_CONFIG } from '@/services/otp';
+import { CommonValidationRules, validateField } from '@/utils/validation';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,223 +19,369 @@ import {
   View
 } from 'react-native';
 
-interface FormData {
-  email: string;
-  password: string;
-  name: string;
-  confirmPassword: string;
-}
-
-interface FormErrors {
-  email?: string;
-  password?: string;
-  name?: string;
-  confirmPassword?: string;
-}
+type AuthStep = 'email' | 'otp' | 'name'
 
 const Login = () => {
-  const { login, register } = useAuth();
+  const { sendOTP, verifyOTPAndLogin } = useAuth()
   
-  const [formData, setFormData] = useState<FormData>({
-    email: '',
-    password: '',
-    name: '',
-    confirmPassword: ''
-  });
+  const [email, setEmail] = useState('')
+  const [otp, setOTP] = useState('')
+  const [name, setName] = useState('')
+  const [emailError, setEmailError] = useState<string>()
+  const [otpError, setOTPError] = useState<string>()
+  const [nameError, setNameError] = useState<string>()
   
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [isLogin, setIsLogin] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [currentStep, setCurrentStep] = useState<AuthStep>('email')
+  const [loading, setLoading] = useState(false)
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  
+  // OTP specific states
+  const [resendCountdown, setResendCountdown] = useState(0)
+  const [askForName, setAskForName] = useState(false)
 
-  const emailRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
-  const nameRef = useRef<TextInput>(null);
-  const confirmPasswordRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null)
+  const otpRef = useRef<TextInput>(null)
+  const nameRef = useRef<TextInput>(null)
+  
+  const countdownIntervalRef = useRef<NodeJS.Timeout>()
 
-  const updateField = useCallback((field: keyof FormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const startCountdown = useCallback((seconds: number) => {
+    setResendCountdown(seconds)
     
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current)
     }
-  }, [errors]);
-
-  const handleBlur = useCallback((field: keyof FormData) => {
-    setTouched(prev => ({ ...prev, [field]: true }));
-    validateField(field);
-  }, []);
-
-  const validateSingleField = useCallback((field: keyof FormData) => {
-    const value = formData[field];
-    let result: ValidationResult = { isValid: true };
-
-    switch (field) {
-      case 'email':
-        result = validateField(value, CommonValidationRules.email)
-        break;
-      case 'password':
-        result = validateField(value, CommonValidationRules.password)
-        break;
-      case 'name':
-        if (!isLogin) {
-          result = validateField(value, CommonValidationRules.name)
+    
+    countdownIntervalRef.current = setInterval(() => {
+      setResendCountdown((prev) => {
+        if (prev <= 1) {
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current)
+          }
+          return 0
         }
-        break;
-      case 'confirmPassword':
-        if (!isLogin) {
-          result = validateField(formData.password, value)
-        }
-        break;
-    }
+        return prev - 1
+      })
+    }, 1000)
+  }, [])
 
-    if (!result.isValid && result.error) {
-      setErrors(prev => ({ ...prev, [field]: result.error }));
-      return false
-    } else {
-      setErrors(prev => ({...prev, [field]: undefined}))
-      return true
-    }
-  }, [formData, isLogin]);
-
-  const validateAllFields = useCallback(() => {
-    const fieldsToValidate: (keyof FormData)[] = isLogin 
-      ? ['email', 'password'] 
-      : ['email', 'password', 'name', 'confirmPassword'];
-
-    let allValid = true;
-
-    fieldsToValidate.forEach(field => {
-      const isValid = validateSingleField(field);
-      if (!isValid) {
-        allValid = false;
+  // cleanup countdown on unmount
+  useEffect(() => {
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current)
       }
-    });
+    }
+  }, [])
 
-    return allValid;
-  }, [isLogin, validateSingleField]);
+  const validateEmail = useCallback(() => {
+    const result = validateField(email, CommonValidationRules.email)
+    if (!result.isValid && result.error) {
+      setEmailError(result.error)
+      return false
+    }
+    setEmailError(undefined)
+    return true
+  }, [email])
 
-  const handleSubmit = async () => {
-    const fieldsToTouch = isLogin 
-      ? ['email', 'password'] 
-      : ['email', 'password', 'name', 'confirmPassword'];
+  const validateOTPCode = useCallback(() => {
+    if (!otp || otp.length !== OTP_UI_CONFIG.OTP_LENGTH) {
+      setOTPError(`Please enter the ${OTP_UI_CONFIG.OTP_LENGTH}-digit code`)
+      return false
+    }
+    setOTPError(undefined)
+    return true
+  }, [otp])
+
+  const validateName = useCallback(() => {
+    if (!name || name.trim().length < 2) {
+      setNameError('Name must be at least 2 characters')
+      return false
+    }
+    setNameError(undefined)
+    return true
+  }, [name])
+
+  const handleSendOTP = async () => {
+    setTouched({ ...touched, email: true })
     
-    setTouched(prev => ({
-      ...prev,
-      ...Object.fromEntries(fieldsToTouch.map(field => [field, true]))
-    }));
-
-    if (!validateAllFields()) {
-      Alert.alert('Validation Error', 'Please fix the errors before continuing');
-      return;
+    if (!validateEmail()) {
+      return
     }
 
-    setLoading(true);
+    setLoading(true)
     try {
-      if (isLogin) {
-        await login(formData.email.trim(), formData.password);
-      } else {
-        await register(formData.email.trim(), formData.password, formData.name.trim());
+      const result = await sendOTP(email.trim())
+      
+      if (result.success) {
+        setCurrentStep('otp')
+        startCountdown(result.resendDelay)
+        Alert.alert('Success', result.message)
+        
+        // focus OTP input after a short delay
+        setTimeout(() => {
+          otpRef.current?.focus()
+        }, 500)
       }
     } catch (error: any) {
-      handleAuthError(error);
+      handleAuthError(error)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-const handleAuthError = (error: any) => {
-    let errorMessage = 'An error occurred. Please try again.';
+  const handleResendOTP = async () => {
+    if (resendCountdown > 0) return
+    
+    setLoading(true)
+    try {
+      const result = await sendOTP(email.trim())
+      
+      if (result.success) {
+        setOTP('') // clear previous OTP
+        setOTPError(undefined)
+        startCountdown(result.resendDelay)
+        Alert.alert('Success', result.message)
+      }
+    } catch (error: any) {
+      handleAuthError(error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleVerifyOTP = async () => {
+    setTouched({ ...touched, otp: true })
+    
+    if (!validateOTPCode()) {
+      return
+    }
+
+    // If name step is showing, validate and proceed with name
+    if (askForName) {
+      setTouched({ ...touched, name: true })
+      if (!validateName()) {
+        return
+      }
+    }
+
+    setLoading(true)
+    try {
+      // Pass name if user provided it, undefined otherwise
+      await verifyOTPAndLogin(email.trim(), otp, askForName && name ? name.trim() : undefined)
+      // Success - AuthContext will handle navigation
+    } catch (error: any) {
+      handleAuthError(error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAuthError = (error: any) => {
+    let errorMessage = 'An error occurred. Please try again.'
     
     if (error.message) {
-      if (error.message.includes('Invalid credentials') || error.message.includes('invalid email')) {
-        errorMessage = 'Invalid email or password';
-        setErrors(prev => ({ 
-          ...prev, 
-          email: 'Invalid credentials',
-          password: 'Invalid credentials'
-        }));
-      } else if (error.message.includes('already exists') || error.message.includes('user with the same id')) {
-        errorMessage = 'An account with this email already exists';
-        setErrors(prev => ({ ...prev, email: 'Email already exists' }));
-      } else if (error.message.includes('Password')) {
-        errorMessage = 'Password must be at least 8 characters long';
-        setErrors(prev => ({ ...prev, password: errorMessage }));
-      } else if (error.message.includes('network') || error.message.includes('Network')) {
-        errorMessage = 'Network error. Please check your internet connection.';
+      if (error.message.includes('Invalid') || error.message.includes('invalid')) {
+        errorMessage = error.message
+        if (currentStep === 'otp') {
+          setOTPError(errorMessage)
+        }
+      } else if (error.message.includes('expired') || error.message.includes('Expired')) {
+        errorMessage = 'Verification code expired. Please request a new one.'
+        setOTPError(errorMessage)
+      } else if (error.message.includes('attempt') || error.message.includes('Maximum')) {
+        errorMessage = error.message
+        setOTPError(errorMessage)
+      } else if (error.message.includes('wait') || error.message.includes('RATE_LIMITED')) {
+        errorMessage = error.message
+      } else if (error.message.includes('email')) {
+        errorMessage = error.message
+        setEmailError(errorMessage)
+      } else {
+        errorMessage = error.message
       }
     }
     
-    Alert.alert('Error', errorMessage);
-  };
+    Alert.alert('Error', errorMessage)
+  }
 
-  const toggleMode = () => {
-    setIsLogin(!isLogin);
-    setFormData({
-      email: '',
-      password: '',
-      name: '',
-      confirmPassword: ''
-    });
-    setErrors({});
-    setTouched({});
-  };
+  const handleBackToEmail = () => {
+    setCurrentStep('email')
+    setOTP('')
+    setOTPError(undefined)
+    setAskForName(false)
+    setName('')
+    setNameError(undefined)
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current)
+    }
+    setResendCountdown(0)
+  }
 
-  const focusNextField = (nextRef: React.RefObject<TextInput>) => {
-    nextRef.current?.focus();
-  };
+  const renderEmailStep = () => (
+    <>
+      <Text className="text-white text-sm font-medium mb-2">Email</Text>
+      <TextInput
+        ref={emailRef}
+        value={email}
+        onChangeText={(text) => {
+          setEmail(text)
+          if (emailError) setEmailError(undefined)
+        }}
+        onBlur={() => {
+          setTouched({ ...touched, email: true })
+          validateEmail()
+        }}
+        placeholder="Enter your email"
+        placeholderTextColor="#a8b5db"
+        className={`bg-dark-200 text-white px-4 py-4 rounded-lg text-base mb-2 ${
+          touched.email && emailError ? 'border border-red-500' : ''
+        }`}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        returnKeyType="done"
+        onSubmitEditing={handleSendOTP}
+      />
+      {touched.email && emailError && (
+        <Text className="text-red-400 text-xs mt-1 ml-1 mb-4">{emailError}</Text>
+      )}
 
-  const renderInput = (
-    field: keyof FormData,
-    placeholder: string,
-    options: {
-      keyboardType?: 'default' | 'email-address';
-      secureTextEntry?: boolean;
-      autoCapitalize?: 'none' | 'words';
-      returnKeyType?: 'next' | 'done';
-      nextRef?: React.RefObject<TextInput | null>;
-      onSubmitEditing?: () => void;
-    } = {}
-  ) => {
-    const hasError = touched[field] && errors[field];
-    
-    return (
-      <View className="mb-4">
-        <Text className="text-white text-sm font-medium mb-2">
-          {field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')}
-        </Text>
-        <TextInput
-          ref={field === 'email' ? emailRef : 
-               field === 'password' ? passwordRef :
-               field === 'name' ? nameRef :
-               confirmPasswordRef}
-          value={formData[field]}
-          onChangeText={(text) => updateField(field, text)}
-          onBlur={() => handleBlur(field)}
-          placeholder={placeholder}
-          placeholderTextColor="#a8b5db"
-          className={`bg-dark-200 text-white px-4 py-4 rounded-lg text-base ${
-            hasError ? 'border border-red-500' : ''
-          }`}
-          keyboardType={options.keyboardType || 'default'}
-          secureTextEntry={options.secureTextEntry || false}
-          autoCapitalize={options.autoCapitalize || 'none'}
-          returnKeyType={options.returnKeyType || 'next'}
-          blurOnSubmit={options.returnKeyType === 'done'}
-          onSubmitEditing={options.onSubmitEditing || (() => {
-            if (options.nextRef) {
-              focusNextField(options.nextRef);
-            }
-          })}
-        />
-        {hasError && (
-          <Text className="text-red-400 text-xs mt-1 ml-1">
-            {errors[field]}
+      <TouchableOpacity
+        onPress={handleSendOTP}
+        disabled={loading}
+        className={`py-4 rounded-lg mt-6 ${loading ? 'bg-gray-600' : 'bg-accent'}`}
+      >
+        {loading ? (
+          <ActivityIndicator color="#ffffff" />
+        ) : (
+          <Text className="text-white text-center text-base font-semibold">
+            Send Verification Code
           </Text>
         )}
+      </TouchableOpacity>
+    </>
+  )
+
+  const renderOTPStep = () => (
+    <>
+      <TouchableOpacity
+        onPress={handleBackToEmail}
+        className="flex-row items-center mb-6"
+      >
+        <Text className="text-accent text-sm">← Change Email</Text>
+      </TouchableOpacity>
+
+      <View className="bg-dark-200 rounded-lg p-4 mb-6">
+        <Text className="text-gray-400 text-sm text-center">
+          We sent a {OTP_UI_CONFIG.OTP_LENGTH}-digit code to
+        </Text>
+        <Text className="text-white text-base text-center font-semibold mt-1">
+          {email}
+        </Text>
       </View>
-    );
-  };
+
+      <Text className="text-white text-sm font-medium mb-2">Verification Code</Text>
+      <TextInput
+        ref={otpRef}
+        value={otp}
+        onChangeText={(text) => {
+          // only allow numbers
+          const cleaned = text.replace(/[^0-9]/g, '')
+          setOTP(cleaned)
+          if (otpError) setOTPError(undefined)
+        }}
+        onBlur={() => {
+          setTouched({ ...touched, otp: true })
+          validateOTPCode()
+        }}
+        placeholder={`Enter ${OTP_UI_CONFIG.OTP_LENGTH}-digit code`}
+        placeholderTextColor="#a8b5db"
+        className={`bg-dark-200 text-white px-4 py-4 rounded-lg text-base text-center text-2xl tracking-widest mb-2 ${
+          touched.otp && otpError ? 'border border-red-500' : ''
+        }`}
+        keyboardType="number-pad"
+        maxLength={OTP_UI_CONFIG.OTP_LENGTH}
+        returnKeyType="done"
+        onSubmitEditing={handleVerifyOTP}
+      />
+      {touched.otp && otpError && (
+        <Text className="text-red-400 text-xs mt-1 ml-1 mb-4">{otpError}</Text>
+      )}
+
+      <Text className="text-gray-400 text-xs text-center mb-6">
+        Code expires in {OTP_UI_CONFIG.EXPIRY_MINUTES} minutes
+      </Text>
+
+      {/* Optional name field */}
+      <TouchableOpacity
+        onPress={() => setAskForName(!askForName)}
+        className="mb-4"
+      >
+        <Text className="text-accent text-sm text-center">
+          {askForName ? '− Hide name field' : '+ Add your name (optional)'}
+        </Text>
+      </TouchableOpacity>
+
+      {askForName && (
+        <View className="mb-4">
+          <Text className="text-white text-sm font-medium mb-2">Full Name (Optional)</Text>
+          <TextInput
+            ref={nameRef}
+            value={name}
+            onChangeText={(text) => {
+              setName(text)
+              if (nameError) setNameError(undefined)
+            }}
+            onBlur={() => {
+              if (name) {
+                setTouched({ ...touched, name: true })
+                validateName()
+              }
+            }}
+            placeholder="Enter your full name"
+            placeholderTextColor="#a8b5db"
+            className={`bg-dark-200 text-white px-4 py-4 rounded-lg text-base mb-2 ${
+              touched.name && nameError ? 'border border-red-500' : ''
+            }`}
+            autoCapitalize="words"
+            returnKeyType="done"
+            onSubmitEditing={handleVerifyOTP}
+          />
+          {touched.name && nameError && (
+            <Text className="text-red-400 text-xs mt-1 ml-1">{nameError}</Text>
+          )}
+        </View>
+      )}
+
+      <TouchableOpacity
+        onPress={handleVerifyOTP}
+        disabled={loading}
+        className={`py-4 rounded-lg mb-4 ${loading ? 'bg-gray-600' : 'bg-accent'}`}
+      >
+        {loading ? (
+          <ActivityIndicator color="#ffffff" />
+        ) : (
+          <Text className="text-white text-center text-base font-semibold">
+            Verify & Sign In
+          </Text>
+        )}
+      </TouchableOpacity>
+
+      <View className="flex-row justify-center items-center">
+        <Text className="text-gray-400 text-sm">Didn&apos;t receive the code? </Text>
+        <TouchableOpacity
+          onPress={handleResendOTP}
+          disabled={loading || resendCountdown > 0}
+        >
+          <Text className={`text-sm font-medium ${
+            resendCountdown > 0 ? 'text-gray-500' : 'text-accent'
+          }`}>
+            {resendCountdown > 0 ? `Resend (${resendCountdown}s)` : 'Resend'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </>
+  )
 
   return (
     <KeyboardAvoidingView 
@@ -260,70 +407,31 @@ const handleAuthError = (error: any) => {
                   Movie Explorer
                 </Text>
                 <Text className="text-gray-400 text-base text-center mt-2">
-                  {isLogin ? 'Welcome back!' : 'Create your account'}
+                  {currentStep === 'email' && 'Sign in with your email'}
+                  {currentStep === 'otp' && 'Enter verification code'}
                 </Text>
               </View>
 
               {/* Form */}
               <View className="space-y-4">
-                {!isLogin && renderInput('name', 'Enter your name', {
-                  autoCapitalize: 'words',
-                  returnKeyType: 'next',
-                  nextRef: emailRef
-                })}
-
-                {renderInput('email', 'Enter your email', {
-                  keyboardType: 'email-address',
-                  returnKeyType: 'next',
-                  nextRef: passwordRef
-                })}
-
-                {renderInput('password', 'Enter your password', {
-                  secureTextEntry: true,
-                  returnKeyType: isLogin ? 'done' : 'next',
-                  nextRef: isLogin ? undefined : confirmPasswordRef,
-                  onSubmitEditing: isLogin ? handleSubmit : undefined
-                })}
-
-                {!isLogin && renderInput('confirmPassword', 'Confirm your password', {
-                  secureTextEntry: true,
-                  returnKeyType: 'done',
-                  onSubmitEditing: handleSubmit
-                })}
-
-                {/* Submit Button */}
-                <TouchableOpacity
-                  onPress={handleSubmit}
-                  disabled={loading}
-                  className={`py-4 rounded-lg mt-6 ${loading ? 'bg-gray-600' : 'bg-accent'}`}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="#ffffff" />
-                  ) : (
-                    <Text className="text-white text-center text-base font-semibold">
-                      {isLogin ? 'Sign In' : 'Create Account'}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-
-                {/* Toggle Mode */}
-                <View className="flex-row justify-center mt-6">
-                  <Text className="text-gray-400 text-sm">
-                    {isLogin ? "Don't have an account? " : 'Already have an account? '}
-                  </Text>
-                  <TouchableOpacity onPress={toggleMode} disabled={loading}>
-                    <Text className="text-accent text-sm font-medium">
-                      {isLogin ? 'Sign Up' : 'Sign In'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                {currentStep === 'email' && renderEmailStep()}
+                {currentStep === 'otp' && renderOTPStep()}
               </View>
+
+              {/* Security Info */}
+              {currentStep === 'email' && (
+                <View className="mt-8 bg-dark-200/50 rounded-lg p-4">
+                  <Text className="text-gray-400 text-xs text-center">
+                    🔒 Secure passwordless authentication. We&apos;ll send you a verification code.
+                  </Text>
+                </View>
+              )}
             </View>
           </ScrollView>
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
-  );
-};
+  )
+}
 
-export default Login;
+export default Login
