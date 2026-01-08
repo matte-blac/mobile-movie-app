@@ -69,7 +69,7 @@ const getCurrentUserId = async (): Promise<string> => {
 }
 
 const handleAppwriteError = (error: any, operation: string) => {
-    console.error(`${operation} error:`, error)
+    logger.error(`${operation} error:`, error)
 
     if (error.code === 401) {
         throw createAuthError('Authentication required', 'UNAUTHORIZED')
@@ -170,7 +170,7 @@ export const getTrendingMovies = async (): Promise<TrendingMovie[] | undefined> 
         ])
         return result.documents as unknown as TrendingMovie[];
     } catch (error) {
-        console.warn('Failed to get trending movies:', error)
+        logger.warn('Failed to get trending movies:', error)
         return []
     }
 }
@@ -299,7 +299,7 @@ export const AuthService = {
             await account.deleteSession('current')
             return {success: true}
         } catch (error) {
-            console.error('Logout error:', error)
+            logger.error('Logout error:', error)
             return {success: false, error}
         }
     }

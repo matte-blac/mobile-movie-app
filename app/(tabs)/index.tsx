@@ -7,6 +7,7 @@ import { useSavedMovies } from "@/context/SavedMoviesContext";
 import useFetch from "@/hooks/useFetch";
 import { fetchMoviePagination, preloadNextPage } from "@/services/api";
 import { getTrendingMovies } from "@/services/appwrite";
+import { logger } from "@/utils/log";
 import { useRouter } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Dimensions, FlatList, Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
@@ -332,7 +333,7 @@ export default function Index() {
                     }))
             }
         } catch (error) {
-            console.error('Failed to load more movies:', error)
+            logger.error('Failed to load more movies:', error)
             setPagination(prev => ({
                 ...prev,
                 loadingMore: false

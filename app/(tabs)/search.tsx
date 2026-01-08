@@ -4,6 +4,7 @@ import { icons } from "@/constants/icons";
 import { images } from "@/constants/images";
 import { fetchMovies } from "@/services/api";
 import { updateSearchCount } from "@/services/appwrite";
+import { logger } from "@/utils/log";
 import React, { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, Image, Text, View } from 'react-native';
 
@@ -171,7 +172,7 @@ const Search = () => {
 
                 // Update search count for analytics
                 if (newMovies.length > 0 && newMovies[0] && page === 1) {
-                    updateSearchCount(query, newMovies[0]).catch(console.error);
+                    updateSearchCount(query, newMovies[0]).catch(logger.error);
                 }
             }
         } catch (err: any) {

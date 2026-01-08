@@ -1,4 +1,5 @@
 import { handleAPIError } from "@/utils/errors"
+import { logger } from "@/utils/log";
 import { useCallback, useEffect, useRef, useState } from "react"
 
 // Search cache entry interface
@@ -261,7 +262,7 @@ export const useSearch = <T>(
                     retryCount++;
                     const currentDelay = retryDelay * Math.pow(1.5, retryCount - 1);
                     
-                    console.log(`Search retry ${retryCount}/${retryAttempts} in ${currentDelay}ms for query: ${searchQuery}`);
+                    logger.debug(`Search retry ${retryCount}/${retryAttempts} in ${currentDelay}ms for query: ${searchQuery}`);
                     await delay(currentDelay);
                     continue;
                 }
@@ -328,7 +329,7 @@ export const useSearch = <T>(
                                 }
                             })
                             .catch(error => {
-                                console.warn('Background search refresh failed:', error);
+                                logger.warn('Background search refresh failed:', error);
                             });
                     }, 1000);
                 }

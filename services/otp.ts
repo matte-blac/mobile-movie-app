@@ -1,6 +1,8 @@
 import { createAuthError, handleAPIError } from "@/utils/errors"
 import { Databases, ID, Query } from "react-native-appwrite"
 import { client } from "./appwrite"
+import { securePost } from "@/utils/secureFetch"
+import { logger } from "@/utils/log"
 
 
 const DATABASE_ID =  process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!
@@ -24,13 +26,9 @@ const generateOTP = (): string => {
 
 const sendOTPEmail = async (email: string, otp: string): Promise<boolean> => {
     try {
-        const response = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${RESEND_API_KEY}`
-            },
-            body: JSON.stringify({
+        const response = await securePost(
+            'https://api.resend.com/emails', 
+            {
                 from: FROM_EMAIL,
                 to: email,
                 subject: 'Your Movie Explorer Verification Code',
@@ -94,20 +92,21 @@ const sendOTPEmail = async (email: string, otp: string): Promise<boolean> => {
                     </body>
                 </html>
           `
-            })
-        })
-
-        if (!response.ok) {
-            const errorData = await response.json()
-            throw new Error(errorData.message || 'Failed to send email')
-        }
-
+        },
+    {
+        headers: {
+            Authorization: `Bearer ${RESEND_API_KEY}`,
+        },
+        timeout: 30000,
+    })
         return true
     } catch (error) {
-        console.error('Resend email error:', error)
+        logger.error('Failed to send OTP:', error)
         throw createAuthError('Failed to send verification email', 'EMAIL_SEND_FAILED')
     }
 }
+
+logger.info('OTP sent successfully')
 
 // check if email can request new OTP (rate limiting)
 const canRequestOTP = async (email: string): Promise<boolean> => {
@@ -128,7 +127,7 @@ const canRequestOTP = async (email: string): Promise<boolean> => {
 
         return recentOTPs.documents.length === 0
     } catch (error) {
-        console.error('Rate limit check error:', error)
+        logger.error('Rate limit check error:', error)
         return true // allow on error
     }
 }
@@ -151,7 +150,7 @@ const cleanupExpiredOTPs = async (email: string): Promise<void> => {
 
         await Promise.all(deletePromises)
     } catch (error) {
-        console.warn('Failed to cleanup expired OTPs:', error)
+        logger.warn('Failed to cleanup expired OTPs:', error)
     }
 }
 
@@ -205,7 +204,7 @@ export const generateAndSendOTP = async (email: string): Promise<{
             resendDelay: OTP_CONFIG.RESEND_DELAY_SECONDS,
         }
     } catch (error) {
-        console.error('Generate OTP error:', error)
+        logger.error('Generate OTP error:', error)
         if (error instanceof Error && error.message.includes('RATE_LIMITED')) {
             throw error
         }
@@ -289,7 +288,7 @@ export const verifyOTP = async (
             message: 'Verfication successful',
         }
     } catch (error) {
-        console.error('Verify OTP error:', error)
+        logger.error('Verify OTP error:', error)
         throw handleAPIError(error)
     }
 }
@@ -323,7 +322,7 @@ export const getOTPStatus = async (email: string): Promise<{
             attemptsRemaining: OTP_CONFIG.MAX_ATTEMPTS - otpRecord.attempts,
         }
     } catch (error) {
-        console.warn('Get OTP status error:', error)
+        logger.warn('Get OTP status error:', error)
         return {hasActiveOTP: false}
     }
 }

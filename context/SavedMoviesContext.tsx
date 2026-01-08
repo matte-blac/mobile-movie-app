@@ -2,6 +2,7 @@ import { getSavedMovies } from "@/services/appwrite"
 import { handleAPIError } from "@/utils/errors"
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { useAuth } from "./AuthContext"
+import { logger } from "@/utils/log"
 
 const SavedMoviesContext = createContext<SavedMoviesContextType | undefined>(undefined)
 
@@ -36,7 +37,7 @@ export const SavedMoviesProvider: React.FC<SavedMoviesProviderProps> = ({childre
             setSavedMovies(movies)
             setSavedMoviesIds(new Set(movies.map(movie => movie.movie_id)))
         } catch (error) {
-            console.error('Error refreshing saved movies:', error)
+            logger.error('Error refreshing saved movies:', error)
             const appError = handleAPIError(error)
 
             if (appError.code === 'UNAUTHORIZED' || appError.code === 'NOT_AUTHENTICATED') {

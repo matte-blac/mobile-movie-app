@@ -1,4 +1,5 @@
 import { handleAPIError } from "@/utils/errors"
+import { logger } from "@/utils/log";
 
 export const TMDB_CONFIG = {
     BASE_URL: 'https://api.themoviedb.org/3',
@@ -170,7 +171,7 @@ const apiRequest = async <T>(
                     const freshData = await performRequest<T>(endpoint, requestOptions, config, enableRetry);
                     requestCache.set(cacheKey, freshData, cacheTTL);
                 } catch (error) {
-                    console.warn('Background refresh failed:', error);
+                    logger.warn('Background refresh failed:', error);
                 }
             };
             
@@ -197,65 +198,45 @@ const performRequest = async <T>(
     retryConfig: RetryConfig,
     enableRetry: boolean
 ): Promise<T> => {
-    let lastError: any;
-    const maxAttempts = enableRetry ? retryConfig.maxRetries + 1 : 1;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-            const response = await fetch(endpoint, {
-                method: 'GET',
-                headers: TMDB_CONFIG.headers,
-                ...requestOptions
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                const error = {
-                    response: {
-                        status: response.status,
-                        statusText: response.statusText,
-                        data: errorData
-                    }
-                };
-                
-                // check if we should retry
-                if (attempt < maxAttempts && enableRetry && isRetryableError(error)) {
-                    const delay = calculateRetryDelay(attempt, retryConfig);
-                    console.log(`Request failed (attempt ${attempt}/${maxAttempts}), retrying in ${delay}ms...`);
-                    await sleep(delay);
-                    continue;
-                }
-                
-                throw handleAPIError(error);
-            }
-
-            return await response.json();
-        } catch (error) {
-            lastError = error;
-            
-            // handle network errors
-            if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                const networkError = {
-                    message: 'Network error. Please check your internet connection.',
-                    code: 'NETWORK_ERROR'
-                };
-                
-                if (attempt < maxAttempts && enableRetry) {
-                    const delay = calculateRetryDelay(attempt, retryConfig);
-                    console.log(`Network error (attempt ${attempt}/${maxAttempts}), retrying in ${delay}ms...`);
-                    await sleep(delay);
-                    continue;
-                }
-                
-                throw handleAPIError(networkError);
-            }
-            
-            // if it's already a handled API error, don't retry
-            throw error;
-        }
-    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
     
-    throw lastError;
+    try {
+        const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: TMDB_CONFIG.headers,
+            signal: controller.signal,
+            ...requestOptions
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw handleAPIError({ 
+                response: {
+                    status: response.status,
+                    statusText: response.statusText,
+                    data: errorData
+                }
+            })
+        };
+
+        return await response.json();
+    } catch (error: any) {
+        clearTimeout(timeoutId);
+
+        if (error.name === 'AbortError') {
+            logger.warn('Request timeout', {endpoint})
+            throw handleAPIError({
+                message: 'Request timeout',
+                code: 'TIMEOUT'
+            })
+        }
+
+        logger.error('Request failed', error, {endpoint})
+        throw error;
+    }
 };
 
 // enhanced movie fetching with paination support
@@ -286,7 +267,7 @@ export const fetchMovies = async ({
         
         return data.results || [];
     } catch (error) {
-        console.error('Failed to fetch movies:', error);
+        logger.error('Failed to fetch movies:', error);
         throw error;
     }
 };
@@ -333,7 +314,7 @@ export const fetchMoviePagination = async ({
             }
         }
     } catch (error) {
-        console.error('Failed to fetch movies with pagination', error);
+        logger.error('Failed to fetch movies with pagination', error);
         throw error;
     }
 };
@@ -398,7 +379,7 @@ export const fetchMoviesBatch = async ({
             }
         }
     } catch (error) {
-        console.error('Failed t fetch movies batch:', error)
+        logger.error('Failed t fetch movies batch:', error)
         throw error
     }
 }
@@ -419,7 +400,7 @@ export const fetchMovieDetails = async (
             ...options
         });
     } catch (error) {
-        console.error('Failed to fetch movie details:', error);
+        logger.error('Failed to fetch movie details:', error);
         throw error;
     }
 };
@@ -472,9 +453,9 @@ export const preloadNextPage = async (
                 ...options
             }
         })
-        console.log(`Preload page ${nextPage} for query: ${query}`)
+        logger.debug(`Preload page ${nextPage} for query: ${query}`)
     } catch (error) {
-        console.warn('Failed to preload next page:', error)
+        logger.warn('Failed to preload next page:', error)
     }
 }
 
@@ -489,7 +470,7 @@ export const cacheUtils = {
             requestCache.set(key, data, ttl);
             return data;
         } catch (error) {
-            console.error('Preload failed:', error);
+            logger.error('Preload failed:', error);
             throw error;
         }
     },

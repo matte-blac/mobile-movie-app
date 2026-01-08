@@ -1,4 +1,5 @@
 import { handleAPIError, shouldRetry } from "@/utils/errors";
+import { logger } from "@/utils/log";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 // Enhanced cache entry interface
@@ -218,7 +219,7 @@ const useFetch = <T>(
                 retryCount++;
                 const currentDelay = retryDelay * Math.pow(retryBackoff, retryCount - 1);
                 
-                console.log(`Retrying request (${retryCount}/${retryAttempts}) in ${currentDelay}ms...`);
+                logger.debug(`Retrying request (${retryCount}/${retryAttempts}) in ${currentDelay}ms...`);
                 await delay(currentDelay);
             }
         }
@@ -342,7 +343,7 @@ const useFetch = <T>(
                 setIsStale(false);
             }
         } catch (error) {
-            console.warn('Background refetch failed:', error);
+            logger.warn('Background refetch failed:', error);
         }
     }, [cacheKey, performFetch]);
 
@@ -422,7 +423,7 @@ export const cacheUtils = {
             globalCache.set(key, data, ttl, staleTime);
             return data;
         } catch (error) {
-            console.error('Preload failed for key:', key, error);
+            logger.error('Preload failed for key:', key, error);
             throw error;
         }
     }

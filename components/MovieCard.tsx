@@ -1,6 +1,7 @@
 import { icons } from "@/constants/icons";
 import { useSavedMovies } from "@/context/SavedMoviesContext";
 import { removeSavedMovie, saveMovie } from '@/services/appwrite';
+import { logger } from "@/utils/log";
 import { Link } from "expo-router";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Text, TouchableOpacity, View } from 'react-native';
@@ -59,37 +60,21 @@ const MovieCard = memo(({
 
             try {
                 if (wasInitiallySaved) {
-                    // Remove from saved movies
                     await removeSavedMovie(id);
                     removeFromGlobalState(id);
                 } else {
-                    // Add to saved movies
                     await saveMovie(movieToSave);
                     addSavedMovie(id);
                 }
-                
-                // Refresh the saved movies to ensure consistency
-                await refreshSavedMovies();
-                
-            } catch (error) {
-                console.error('Error saving movie:', error);
-                const errorMessage = error instanceof Error ? error.message : 'An error occurred';
 
-                if (errorMessage.includes('already saved')) {
-                    Alert.alert('Already Saved', 'This movie is already in your saved list.');
-                    addSavedMovie(id);
-                } else if (errorMessage.includes('not authorized')) {
-                    Alert.alert('Permission Error', 'Please make sure you are logged in and have permission to save movies.');
-                } else {
-                    Alert.alert('Error', `Failed to ${wasInitiallySaved ? 'remove' : 'save'} movie. Please try again.`);
-                }
-                
-                // Refresh to get the actual state from server
                 await refreshSavedMovies();
-            } finally {
-                if (isMountedRef.current) {
-                    setIsLoading(false);
-                }
+            } catch (error) {
+                logger.error('Failed to toggle movie save state:', error, {
+                    movieId: id,
+                    action: wasInitiallySaved ? 'remove' : 'save'
+                });
+                
+                await refreshSavedMovies();
             }
         }, 300)
     }, [id, isSaved, movieToSave, addSavedMovie, removeFromGlobalState, refreshSavedMovies, isLoading]);

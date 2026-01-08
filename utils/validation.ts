@@ -23,8 +23,8 @@ export const ValidationPatterns = {
 export const ValidationMessages = {
     required: 'This field is required',
     email: 'Please enter a valid email address',
-    password: 'Password must be at least 4 characters with uppercase, lowercase and number',
-    strongPassword: 'Password must contain uppercase, lowercase, number and special characters',
+    password: 'Must be at least 4 characters with uppercase, lowercase and number',
+    strongPassword: 'Must contain uppercase, lowercase, number and special characters',
     name: 'Name must be 2-50 characters and contain only letters and spaces',
     minLength: (min: number) => `Must be at least ${min} characters long`,
     maxLength: (max: number) => `Must be no more than ${max} characters long`,

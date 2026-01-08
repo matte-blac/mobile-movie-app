@@ -1,5 +1,6 @@
 import { client } from "@/services/appwrite";
 import { generateAndSendOTP, verifyOTP } from "@/services/otp";
+import { createLogger } from "@/utils/log";
 import { router } from "expo-router";
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useContext, useEffect, useState } from "react";
@@ -22,6 +23,7 @@ interface SessionData {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const logger = createLogger('AuthContext')
 
 const account = new Account(client);
 
@@ -58,7 +60,7 @@ const SessionManager = {
         try {
             await SecureStore.setItemAsync(STORAGE_KEYS.SESSION, JSON.stringify(SessionData))
         } catch (error) {
-            console.error('Failed to save session:', error)
+            logger.error('Failed to save session:', error)
         }
     },
 
@@ -77,7 +79,7 @@ const SessionManager = {
 
             return session
         } catch (error) {
-            console.error('Failed to get session:', error)
+            logger.error('Failed to get session:', error)
             return null
         }
     },
@@ -87,7 +89,7 @@ const SessionManager = {
             await SecureStore.deleteItemAsync(STORAGE_KEYS.SESSION)
             await SecureStore.deleteItemAsync(STORAGE_KEYS.USER_DATA)
         } catch (error) {
-            console.error('Failed to clear session:', error)
+            logger.error('Failed to clear session:', error)
         }
     },
 
@@ -95,7 +97,7 @@ const SessionManager = {
         try {
             await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(user))
         } catch (error) {
-            console.error('Failed to save user data:', error)
+            logger.error('Failed to save user data:', error)
         }
     },
 
@@ -104,7 +106,7 @@ const SessionManager = {
             const userString = await SecureStore.getItemAsync(STORAGE_KEYS.USER_DATA)
             return userString ? JSON.parse(userString) : null
         } catch (error) {
-            console.error('Failed to get user data:', error)
+            logger.error('Failed to get user data:', error)
             return null
         }
     }
@@ -128,14 +130,14 @@ export const AuthProvider = ({ children }: {children: React.ReactNode}) => {
                     await SessionManager.saveUserData(currentUser)
                     setUser(currentUser)
                 } catch (error) {
-                    console.log('Saved session invalid, attempting refresh...')
+                    logger.info('Saved session invalid, attempting refresh:', error)
                     await attemptSessionRefresh()
                 }
             } else {
                 await checkCurrentUser()
             }
         } catch (error) {
-            console.log('No active session found')
+            logger.debug('No active session found:', error)
             await SessionManager.clearSession()
             setUser(null)
         } finally {
@@ -178,7 +180,7 @@ export const AuthProvider = ({ children }: {children: React.ReactNode}) => {
             await SessionManager.saveUserData(currentUser)
             setUser(currentUser)
         } catch (error) {
-            console.log('Session refresh failed')
+            logger.info('Session refresh failed')
             await SessionManager.clearSession()
             setUser(null)
             throw error
@@ -189,7 +191,7 @@ export const AuthProvider = ({ children }: {children: React.ReactNode}) => {
        try {
         await attemptSessionRefresh()
        } catch (RefreshError) {
-        console.error('Session refresh error:', RefreshError)
+        logger.error('Session refresh error:', RefreshError)
         throw RefreshError
        } 
     }
@@ -201,7 +203,7 @@ export const AuthProvider = ({ children }: {children: React.ReactNode}) => {
             const result = await generateAndSendOTP(email)
             return result
         } catch (error) {
-            console.error('Send OTP error:', error)
+            logger.error('Send OTP error:', error)
             throw error
         } finally {
             setLoading(false)
@@ -222,7 +224,7 @@ export const AuthProvider = ({ children }: {children: React.ReactNode}) => {
         try {
             await account.deleteSession('current')
         } catch (error) {
-            console.log('No session to delete', error)
+            logger.debug('No session to delete', error)
         }
 
         // generate consistent password from email
@@ -240,14 +242,14 @@ export const AuthProvider = ({ children }: {children: React.ReactNode}) => {
                 name || undefined
             )
 
-            console.log('New account created')
+            logger.debug('New account created')
             isNewUser = true
         } catch (createError: any) {
             if (createError.code === 409) {
-                console.log('Existing user, proceeding to login')
+                logger.debug('Existing user, proceeding to login')
                 isNewUser = false
             } else {
-                console.error('Account creation error:', createError)
+                logger.error('Account creation error:', createError)
                 throw new Error('Failed to create account. Please try again.')
             }
         }
@@ -255,9 +257,9 @@ export const AuthProvider = ({ children }: {children: React.ReactNode}) => {
         // create email session with the consistent password
         try {
             await account.createEmailPasswordSession(email, password)
-            console.log('Session created successfully')
+            logger.debug('Session created successfully')
         } catch (sessionError: any) {
-            console.error('Session creation error:', sessionError)
+            logger.error('Session creation failed:', sessionError)
             throw new Error('Failed to create session. Please try again.')
         }
 
@@ -265,9 +267,9 @@ export const AuthProvider = ({ children }: {children: React.ReactNode}) => {
         if (!isNewUser && name) {
             try {
                 await account.updateName(name)
-                console.log('Name updated for existing user')
+                logger.debug('Name updated for existing user')
             } catch (nameError) {
-                console.warn('Could not update name:', nameError)
+                logger.warn('Could not update name:', nameError)
             }
         } 
         
@@ -285,13 +287,13 @@ export const AuthProvider = ({ children }: {children: React.ReactNode}) => {
 
         router.replace('/(tabs)')
     } catch (VerifyError: any) {
-        console.error('Verify OTP and login error:', VerifyError)
+        logger.error('Verify OTP and login error:', VerifyError)
 
         // clean up any session on error
         try {
             await account.deleteSession('current')
         } catch (cleanupError) {
-            console.log('No session to clean up:', cleanupError)
+            logger.debug('No session to clean up:', cleanupError)
         }
         throw VerifyError
     } finally {
@@ -307,7 +309,7 @@ export const AuthProvider = ({ children }: {children: React.ReactNode}) => {
             setUser(null)
             router.replace('/login')
         } catch (error) {
-            console.error('Logout error:', error)
+            logger.error('Logout error:', error)
             await SessionManager.clearSession()
             setUser(null)
             router.replace('/login')
