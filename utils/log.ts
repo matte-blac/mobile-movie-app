@@ -134,7 +134,7 @@ class SecureLogger {
         if (IS_DEV) {
             console.error(
                 formatMessage('ERROR', message, this.context),
-                sanitizeError,
+                sanitizedError,
                 sanitizedContext
             )
         } else {

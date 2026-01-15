@@ -26,10 +26,9 @@ const Login = () => {
   
   const [email, setEmail] = useState('')
   const [otp, setOTP] = useState('')
-  const [name, setName] = useState('')
+  const [userId, setUserId] = useState<string>('')
   const [emailError, setEmailError] = useState<string>()
   const [otpError, setOTPError] = useState<string>()
-  const [nameError, setNameError] = useState<string>()
   
   const [currentStep, setCurrentStep] = useState<AuthStep>('email')
   const [loading, setLoading] = useState(false)
@@ -37,11 +36,9 @@ const Login = () => {
   
   // OTP specific states
   const [resendCountdown, setResendCountdown] = useState(0)
-  const [askForName, setAskForName] = useState(false)
 
   const emailRef = useRef<TextInput>(null)
   const otpRef = useRef<TextInput>(null)
-  const nameRef = useRef<TextInput>(null)
   
   const countdownIntervalRef = useRef<NodeJS.Timeout>()
 
@@ -93,15 +90,6 @@ const Login = () => {
     return true
   }, [otp])
 
-  const validateName = useCallback(() => {
-    if (!name || name.trim().length < 2) {
-      setNameError('Name must be at least 2 characters')
-      return false
-    }
-    setNameError(undefined)
-    return true
-  }, [name])
-
   const handleSendOTP = async () => {
     setTouched({ ...touched, email: true })
     
@@ -114,6 +102,9 @@ const Login = () => {
       const result = await sendOTP(email.trim())
       
       if (result.success) {
+        // store userId for verification step
+        setUserId(result.userId)
+
         setCurrentStep('otp')
         startCountdown(result.resendDelay)
         Alert.alert('Success', result.message)
@@ -138,6 +129,7 @@ const Login = () => {
       const result = await sendOTP(email.trim())
       
       if (result.success) {
+        setUserId(result.userId)
         setOTP('') // clear previous OTP
         setOTPError(undefined)
         startCountdown(result.resendDelay)
@@ -157,18 +149,16 @@ const Login = () => {
       return
     }
 
-    // If name step is showing, validate and proceed with name
-    if (askForName) {
-      setTouched({ ...touched, name: true })
-      if (!validateName()) {
+    if (!userId) {
+      Alert.alert('Error', 'Session expired. Please request a new verification code.')
+      handleBackToEmail()
         return
-      }
     }
 
     setLoading(true)
     try {
       // Pass name if user provided it, undefined otherwise
-      await verifyOTPAndLogin(email.trim(), otp, askForName && name ? name.trim() : undefined)
+      await verifyOTPAndLogin(userId, otp)
       // Success - AuthContext will handle navigation
     } catch (error: any) {
       handleAuthError(error)
@@ -208,10 +198,8 @@ const Login = () => {
   const handleBackToEmail = () => {
     setCurrentStep('email')
     setOTP('')
+    setUserId('')
     setOTPError(undefined)
-    setAskForName(false)
-    setName('')
-    setNameError(undefined)
     if (countdownIntervalRef.current) {
       clearInterval(countdownIntervalRef.current)
     }
@@ -311,47 +299,6 @@ const Login = () => {
       <Text className="text-gray-400 text-xs text-center mb-6">
         Code expires in {OTP_UI_CONFIG.EXPIRY_MINUTES} minutes
       </Text>
-
-      {/* Optional name field */}
-      <TouchableOpacity
-        onPress={() => setAskForName(!askForName)}
-        className="mb-4"
-      >
-        <Text className="text-accent text-sm text-center">
-          {askForName ? '− Hide name field' : '+ Add your name (optional)'}
-        </Text>
-      </TouchableOpacity>
-
-      {askForName && (
-        <View className="mb-4">
-          <Text className="text-white text-sm font-medium mb-2">Full Name (Optional)</Text>
-          <TextInput
-            ref={nameRef}
-            value={name}
-            onChangeText={(text) => {
-              setName(text)
-              if (nameError) setNameError(undefined)
-            }}
-            onBlur={() => {
-              if (name) {
-                setTouched({ ...touched, name: true })
-                validateName()
-              }
-            }}
-            placeholder="Enter your full name"
-            placeholderTextColor="#a8b5db"
-            className={`bg-dark-200 text-white px-4 py-4 rounded-lg text-base mb-2 ${
-              touched.name && nameError ? 'border border-red-500' : ''
-            }`}
-            autoCapitalize="words"
-            returnKeyType="done"
-            onSubmitEditing={handleVerifyOTP}
-          />
-          {touched.name && nameError && (
-            <Text className="text-red-400 text-xs mt-1 ml-1">{nameError}</Text>
-          )}
-        </View>
-      )}
 
       <TouchableOpacity
         onPress={handleVerifyOTP}
